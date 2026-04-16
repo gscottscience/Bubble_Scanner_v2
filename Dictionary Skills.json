@@ -1,0 +1,42 @@
+{
+    "bubble_threshold": 0.78,
+    "bubble_intensity_threshold": 170,
+    "num_questions": 40,
+    "tiebreaker_questions": [],
+    "circle_params": {
+        "dp": 1,
+        "maxRadius": 25,
+        "minDist": 25,
+        "minRadius": 8,
+        "param1": 30,
+        "param2": 15
+    },
+    "answer_columns": [
+        {
+            "label": "Col1",
+            "roi": [95, 550, 230, 860],
+            "start_q": 1,
+            "end_q": 25,
+            "choices": 5,
+            "type": "A-E"
+        },
+        {
+            "label": "Col2_Upper",
+            "roi": [520, 550, 230, 250],
+            "start_q": 26,
+            "end_q": 32,
+            "choices": 5,
+            "type": "A-E"
+        },
+        {
+            "label": "Col2_Lower",
+            "roi": [520, 860, 370, 280],
+            "start_q": 33,
+            "end_q": 40,
+            "choices": 8,
+            "type": "A-H"
+        }
+    ],
+    "student_id_roi": [65, 180, 170, 295],
+    "student_id_threshold": 0.7
+}

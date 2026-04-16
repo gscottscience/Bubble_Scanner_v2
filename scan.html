@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Bubble Sheet Scanner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='static.css') }}">
+    <style>
+        .debug-image {
+            width: 75%;
+            max-width: 100%;
+            border: 1px solid #ccc;
+            margin-top: 1em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Answer Sheet Scanner</h1>
+        <div id="notification" class="notification" style="display:none;">Answer key loaded from previous use.</div>
+        <div id="error-notification" class="notification error-notification" style="display:none;">Error loading answer key. Please enter and save a new one.</div>
+        <form id="scan-form" enctype="multipart/form-data" autocomplete="off">
+            <div class="form-group">
+                <label for="image-upload">Student Answer Sheet Upload:</label>
+                <input type="file" id="image-upload" name="bubble_sheet_image" accept=".pdf,.png,.jpg,.jpeg" required>
+            </div>
+            <div class="form-group">
+                <label for="test-select">Choose Test:</label>
+                <select id="test-select" name="test_name" required>
+                    <option value="">-- Select a Test --</option>
+                    <option value="Dictionary Skills">Dictionary Skills</option>
+                    <option value="Art">Art</option>
+                    <option value="Listening">Listening</option>
+                    <option value="Science">Science</option>
+                    <option value="Chess Puzzle">Chess Puzzle</option>
+                    <option value="Mathematics">Mathematics</option>
+                    <option value="Social Studies">Social Studies</option>
+                    <option value="Maps/Graphs/Charts">Maps/Graphs/Charts</option>
+                </select>
+            </div>
+            <div class="form-group checkbox-group">
+                <input type="checkbox" name="grade_sheets" id="grade">
+                <label for="grade">Grade the tests?</label>
+                <button type="button" id="edit-answer-key-btn" style="margin-left:1em;">Edit Answer Key</button>
+            </div>
+            <div class="form-group" id="answer_key_group" style="display: none;">
+                <label for="answer_key">Answer Key:</label>
+                <div class="answer-key-container">
+                    <textarea name="answer_key" id="answer_key" rows="4" placeholder="Paste your answer key here..."></textarea>
+                    <button type="button" class="paste-button" onclick="pasteFromClipboard()">Paste</button>
+                </div>
+                <div class="format-hint">
+                    Format: 1:A,2:B,3:C,... (e.g., "1:A,2:B,3:C,4:D,5:E")
+                </div>
+                <div class="button-group">
+                    <button type="button" class="save-button" onclick="saveAnswerKey()">Save Answer Key</button>
+                    <button type="button" class="paste-button" style="position: static; width: auto;" onclick="clearAnswerKey()">Clear</button>
+                </div>
+                <div id="key_info" class="key-info"></div>
+            </div>
+            <div class="form-group">
+                <label>Select Grade Level(s):</label><br>
+                <label><input type="checkbox" name="grade_levels" value="6"> 6</label>
+                <label><input type="checkbox" name="grade_levels" value="7"> 7</label>
+                <label><input type="checkbox" name="grade_levels" value="8"> 8</label>
+                <br><small>You can select one or more grades.</small>
+            </div>
+            <button type="submit" id="scan-button">Scan and Grade</button>
+        </form>
+
+    <!-- Inline Answer Key Modal -->
+    <div id="answer-key-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.4); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:white; padding:2em; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15); min-width:320px; max-width:500px; margin:auto;">
+            <h2>Edit Answer Key</h2>
+            <div style="font-size:0.98em; color:#333; margin-bottom:0.5em; background:#f8f9fa; border:1px solid #eee; border-radius:4px; padding:0.7em;">
+                <strong>Format:</strong> <br>
+                Enter answers as <code>1:A, 2:B, 3:C</code> (comma-separated, e.g. <code>1:A,2:B,3:C</code>).<br>
+                Each entry is <code>question_number:answer_letter</code>.<br>
+                Example: <code>1:A, 2:C, 3:B, 4:D</code>
+            </div>
+            <div id="answer-key-modal-status" style="margin-bottom:0.5em; color:#c00;"></div>
+            <textarea id="answer-key-textarea" rows="10" style="width:100%; font-family:monospace;"></textarea>
+            <div style="margin-top:1em; text-align:right;">
+                <button id="save-answer-key-btn" style="background:#007bff; color:white; padding:0.5em 1.2em; border:none; border-radius:4px;">Save</button>
+                <button id="cancel-answer-key-btn" style="background:#ccc; color:#333; padding:0.5em 1.2em; border:none; border-radius:4px; margin-left:1em;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="results-wrapper" style="display: none;">
+        <h2>Results</h2>
+        <div id="results-container"></div>
+    </div>
+    <div id="status-message" class="status-message"></div>
+
+    <!-- Region Editor UI -->
+    <div id="region-editor" class="region-editor" style="display:none;">
+        <h3>Region Editor</h3>
+        <p>Adjust the coordinates of the detection regions to match your answer sheet.</p>
+        <div class="region-tabs">
+            <div class="region-tab active" onclick="switchTab('id')">ID Region</div>
+            <div class="region-tab" onclick="switchTab('answer')">Answer Regions</div>
+        </div>
+        <div id="id-tab" class="region-content active">
+            <h4>ID Region Settings</h4>
+            <div class="region-inputs">
+                <div>
+                    <label for="id-x">X Position (%)</label>
+                    <input type="number" id="id-x" min="0" max="100" step="0.1" value="10">
+                </div>
+                <div>
+                    <label for="id-y">Y Position (%)</label>
+                    <input type="number" id="id-y" min="0" max="100" step="0.1" value="5">
+                </div>
+                <div>
+                    <label for="id-width">Width (%)</label>
+                    <input type="number" id="id-width" min="1" max="100" step="0.1" value="40">
+                </div>
+                <div>
+                    <label for="id-height">Height (%)</label>
+                    <input type="number" id="id-height" min="1" max="100" step="0.1" value="25">
+                </div>
+            </div>
+            <div class="region-buttons">
+                <button onclick="updateIdRegion()">Update ID Region</button>
+                <button onclick="resetIdRegion()">Reset to Default</button>
+            </div>
+        </div>
+        <div id="answer-tab" class="region-content">
+            <h4>Answer Regions</h4>
+            <div class="region-list">
+                <h4>Current Answer Regions:</h4>
+                <div id="answer-regions-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // Inline modal answer key editor logic
+    // Global selectedTest variable
+    let selectedTest = null;
+    document.addEventListener('DOMContentLoaded', function() {
+        const testSelect = document.getElementById('test-select');
+        // Set selectedTest on change
+        testSelect.addEventListener('change', function() {
+            selectedTest = this.value;
+        });
+        const editKeyBtn = document.getElementById('edit-answer-key-btn');
+        const answerKeyModal = document.getElementById('answer-key-modal');
+        const answerKeyTextarea = document.getElementById('answer-key-textarea');
+        const saveAnswerKeyBtn = document.getElementById('save-answer-key-btn');
+        const cancelAnswerKeyBtn = document.getElementById('cancel-answer-key-btn');
+        const answerKeyModalStatus = document.getElementById('answer-key-modal-status');
+
+        editKeyBtn.onclick = async function(e) {
+            e.preventDefault(); // Prevent form submission
+            e.stopPropagation();
+            const testName = testSelect.value;
+            if (!testName) {
+                alert('Please select a test first.');
+                return;
+            }
+            answerKeyModalStatus.textContent = '';
+            answerKeyTextarea.value = '';
+            answerKeyModal.style.display = 'flex';
+            // Fetch current answer key
+            try {
+                const resp = await fetch('/api/keys');
+                const keys = await resp.json();
+                answerKeyTextarea.value = keys[testName] || '';
+            } catch {
+                answerKeyTextarea.value = '';
+            }
+        };
+
+        cancelAnswerKeyBtn.onclick = function() {
+            answerKeyModal.style.display = 'none';
+        };
+
+        saveAnswerKeyBtn.onclick = async function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const testName = testSelect.value;
+            const keyString = answerKeyTextarea.value;
+            answerKeyModalStatus.textContent = '';
+            if (!testName) {
+                answerKeyModalStatus.textContent = 'No test selected.';
+                return;
+            }
+            try {
+                const resp = await fetch('/api/keys', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ test_name: testName, key_string: keyString })
+                });
+                const result = await resp.json();
+                if (resp.ok) {
+                    answerKeyModalStatus.style.color = '#28a745';
+                    answerKeyModalStatus.textContent = 'Answer key saved!';
+                    setTimeout(() => { answerKeyModal.style.display = 'none'; }, 800);
+                } else {
+                    answerKeyModalStatus.style.color = '#c00';
+                    answerKeyModalStatus.textContent = result.error || 'Error saving answer key.';
+                }
+            } catch (err) {
+                answerKeyModalStatus.style.color = '#c00';
+                answerKeyModalStatus.textContent = 'Error saving answer key.';
+            }
+        };
+
+        // Prevent Enter key in textarea or modal from submitting scan form
+        answerKeyModal.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && (e.target === answerKeyTextarea || e.target === saveAnswerKeyBtn)) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        });
+    });
+    document.addEventListener('DOMContentLoaded', function() {
+        // Store all configs
+        let allConfigs = {};
+
+        // Fetch all test configs on page load
+        fetch('/api/test_configs')
+            .then(response => response.json())
+            .then(data => {
+                allConfigs = data;
+            });
+
+        var scanForm = document.getElementById('scan-form');
+        var testSelect = document.getElementById('test-select');
+    // No gradeSelect, use checkboxes
+        var scanButton = document.getElementById('scan-button');
+        var resultsWrapper = document.getElementById('results-wrapper');
+        var resultsContainer = document.getElementById('results-container');
+        var statusMessage = document.getElementById('status-message');
+
+        scanForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            var formData = new FormData(scanForm);
+            if (!testSelect.value) {
+                alert('Please select a test.');
+                return;
+            }
+            // Collect selected grades
+            var checkedGrades = Array.from(document.querySelectorAll('input[name="grade_levels"]:checked')).map(cb => cb.value);
+            if (checkedGrades.length === 0) {
+                alert('Please select at least one grade level.');
+                return;
+            }
+            // Add all selected grades to formData
+            checkedGrades.forEach(function(grade) {
+                formData.append('grade_levels', grade);
+            });
+
+            // Load ROI config for selected test (no longer needed, unified ROI logic)
+            selectedTest = testSelect.value;
+
+            scanButton.disabled = true;
+            scanButton.textContent = 'Scanning...';
+            statusMessage.textContent = 'Processing... please wait.';
+            statusMessage.className = 'status-message';
+            resultsWrapper.style.display = 'none';
+            resultsContainer.innerHTML = '';
+
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/scan', true);
+            xhr.onload = function() {
+                scanButton.disabled = false;
+                scanButton.textContent = 'Scan and Grade';
+                let data;
+                try {
+                    data = JSON.parse(xhr.responseText);
+                } catch (e) {
+                    statusMessage.textContent = 'Error: Invalid server response.';
+                    statusMessage.className = 'status-message error';
+                    return;
+                }
+                if (xhr.status === 200) {
+                    if (data.error) {
+                        statusMessage.textContent = 'Error: ' + data.error;
+                        statusMessage.className = 'status-message error';
+                        return;
+                    }
+                    if (!data.results || !Array.isArray(data.results) || data.results.length === 0) {
+                        statusMessage.textContent = 'No results returned from scan.';
+                        statusMessage.className = 'status-message error';
+                        resultsWrapper.style.display = 'none';
+                        resultsContainer.innerHTML = '';
+                        return;
+                    }
+                    // Use config for overlays (no longer needed, unified ROI logic)
+                    displayResults(data.results);
+                    resultsWrapper.style.display = 'block';
+                    statusMessage.textContent = 'Scan complete.';
+                    statusMessage.className = 'status-message success';
+                } else {
+                    statusMessage.textContent = 'Error: ' + xhr.statusText;
+                    statusMessage.className = 'status-message error';
+                }
+            };
+            xhr.onerror = function() {
+                scanButton.disabled = false;
+                scanButton.textContent = 'Scan and Grade';
+                statusMessage.textContent = 'Network error.';
+                statusMessage.className = 'status-message error';
+            };
+            xhr.send(formData);
+        });
+
+
+        // --- Unified ROI overlay/slider/drag logic from configure.html ---
+        // This logic ensures all overlays are interactive, robust, and in sync with sliders.
+        // It is adapted for the scan/results page context.
+
+        // Helper: get all ROI keys from config (arrays of 4 numbers)
+        function getRoiKeys(config) {
+            return Object.keys(config).filter(k => {
+                const v = config[k];
+                return Array.isArray(v) && v.length === 4 && v.every(n => typeof n === 'number');
+            });
+        }
+
+        // Helper: assign color/label for ROI
+        function roiColorLabel(key) {
+            if (key.toLowerCase().includes('student')) return {color:'#c0f', label:'Student ID ROI'};
+            if (key.toLowerCase().includes('col')) return {color:'#fd7e14', label:key.replace(/_/g,' ')};
+            if (key.toLowerCase().includes('answer')) return {color:'#28a745', label:key.replace(/_/g,' ')};
+            return {color:'#00f', label:key};
+        }
+
+        // Draw overlays and enable drag for each result
+        function displayResults(results) {
+            resultsContainer.innerHTML = '';
+            results.forEach((result, idx) => {
+                const sheetDiv = document.createElement('div');
+                sheetDiv.className = 'sheet-result';
+                sheetDiv.style.marginBottom = '2em';
+                // Sheet info
+                const info = document.createElement('div');
+                info.innerHTML = `<strong>Sheet #${result.sheet}</strong>` + (result.error ? `<span style='color:red'> - ${result.error}</span>` : '');
+                sheetDiv.appendChild(info);
+                // Layout: image/canvas left, sliders right
+                const rowDiv = document.createElement('div');
+                rowDiv.style.display = 'flex';
+                rowDiv.style.alignItems = 'flex-start';
+                // Preview image and overlay canvas
+                let img, canvas;
+                let config = allConfigs && selectedTest ? allConfigs[selectedTest] : null;
+                // Only use actual ROI keys and their row/col info from config/scan result
+                // Use only detected grid ROIs and grid info from scan result
+                let roiRects = [];
+                // Student ID grid (if present)
+                // Only show the backend-transformed Student ID ROI (no template/extra overlays)
+                let studentIdRoi = result.student_id_grid_roi && Array.isArray(result.student_id_grid_roi) ? result.student_id_grid_roi.slice() : null;
+                if (studentIdRoi) {
+                    roiRects.push({
+                        label: 'Student ID',
+                        key: 'student_id_grid_roi',
+                        color: '#2196f3', // blue
+                        rect: studentIdRoi,
+                        rows: result.student_id_grid_rows || 10,
+                        cols: result.student_id_grid_cols || 4
+                    });
+                }
+                // Answers Col 1
+                if (result.answers_grid_col1_roi && Array.isArray(result.answers_grid_col1_roi)) {
+                    let col1 = result.answers_grid_col1_roi.slice();
+                    roiRects.push({
+                        label: 'Answers Col 1',
+                        key: 'answers_grid_col1_roi',
+                        color: '#43a047', // green
+                        rect: col1,
+                        rows: result.answers_grid_col1_rows || 25,
+                        cols: result.answers_grid_col1_cols || 5
+                    });
+                }
+                // Answers Col 2 Upper
+                if (result.answers_grid_col2_upper_roi && Array.isArray(result.answers_grid_col2_upper_roi)) {
+                    let col2u = result.answers_grid_col2_upper_roi.slice();
+                    roiRects.push({
+                        label: 'Answers Col 2 Upper',
+                        key: 'answers_grid_col2_upper_roi',
+                        color: '#43a047', // green
+                        rect: col2u,
+                        rows: result.answers_grid_col2_upper_rows || 7,
+                        cols: result.answers_grid_col2_upper_cols || 5
+                    });
+                }
+                // Answers Col 2 Lower
+                if (result.answers_grid_col2_lower_roi && Array.isArray(result.answers_grid_col2_lower_roi)) {
+                    let col2l = result.answers_grid_col2_lower_roi.slice();
+                    roiRects.push({
+                        label: 'Answers Col 2 Lower',
+                        key: 'answers_grid_col2_lower_roi',
+                        color: '#43a047', // green
+                        rect: col2l,
+                        rows: result.answers_grid_col2_lower_rows || 8,
+                        cols: result.answers_grid_col2_lower_cols || 8
+                    });
+                }
+                if (result.debug_image_url) {
+                    const container = document.createElement('div');
+                    container.style.position = 'relative';
+                    img = document.createElement('img');
+                    img.src = result.debug_image_url;
+                    img.className = 'debug-image';
+                    img.alt = `Preview for sheet ${result.sheet}`;
+                    img.style.display = 'block';
+                    img.onload = function() {
+                        // Set canvas to match image natural size
+                        canvas.width = img.naturalWidth;
+                        canvas.height = img.naturalHeight;
+                        canvas.style.width = img.width + 'px';
+                        canvas.style.height = img.height + 'px';
+                        drawOverlay();
+                    };
+                    container.appendChild(img);
+                    canvas = document.createElement('canvas');
+                    // Default size, will be updated on img load
+                    canvas.width = 400;
+                    canvas.height = 520;
+                    canvas.style.position = 'absolute';
+                    canvas.style.left = '0';
+                    canvas.style.top = '0';
+                    canvas.style.pointerEvents = 'auto';
+                    container.appendChild(canvas);
+                    rowDiv.appendChild(container);
+                }
+                // ROI sliders (real, in sync)
+                const slidersDiv = document.createElement('div');
+                slidersDiv.style.margin = '0 0 0 2em';
+                slidersDiv.style.minWidth = '220px';
+                slidersDiv.innerHTML = '<strong>Adjust ROIs:</strong><br>';
+                if (roiRects.length === 0) {
+                    slidersDiv.innerHTML += '<em>No ROI regions found in config.</em>';
+                } else {
+                    roiRects.forEach((roi, i) => {
+                        const roiGroup = document.createElement('div');
+                        roiGroup.style.marginBottom = '0.7em';
+                        roiGroup.style.padding = '0.2em 0.5em 0.5em 0.5em';
+                        roiGroup.style.border = '1px solid #eee';
+                        roiGroup.style.borderRadius = '6px';
+                        roiGroup.style.background = '#fafbfc';
+                        const roiLabel = document.createElement('div');
+                        roiLabel.style.fontWeight = 'bold';
+                        roiLabel.style.marginBottom = '0.2em';
+                        roiLabel.textContent = roi.label;
+                        roiGroup.appendChild(roiLabel);
+                        ['X','Y','W','H'].forEach((dim, j) => {
+                            const sliderLabel = document.createElement('span');
+                            sliderLabel.textContent = `${dim}: `;
+                            sliderLabel.style.marginRight = '2px';
+                            roiGroup.appendChild(sliderLabel);
+                            const slider = document.createElement('input');
+                            slider.type = 'range';
+                            if (j === 0 || j === 2) { // X or W
+                                slider.min = 0;
+                                slider.max = canvas ? canvas.width : 400;
+                            } else if (j === 1 || j === 3) { // Y or H
+                                slider.min = 0;
+                                slider.max = canvas ? canvas.height : 520;
+                            }
+                            slider.value = roi.rect[j];
+                            slider.style.width = '80px';
+                            slider.id = `${roi.key}-slider-${dim}-sheet${idx}`;
+                            slider.oninput = function() {
+                                roi.rect[j] = parseInt(slider.value);
+                                drawOverlay();
+                            };
+                            roiGroup.appendChild(slider);
+                        });
+                        slidersDiv.appendChild(roiGroup);
+                    });
+                }
+                rowDiv.appendChild(slidersDiv);
+                // Make overlays draggable for all ROIs
+                if (canvas) {
+                    rowDiv.appendChild(slidersDiv);
+                    sheetDiv.appendChild(rowDiv);
+                    // Answers and student ID
+                    const answersDiv = document.createElement('div');
+                    // Render Student ID
+                    answersDiv.innerHTML = `<strong>Student ID:</strong> <span class="student-id-val">${result.student_id || 'N/A'}</span><br><strong>Answers:</strong>`;
+                    // Render answer table
+                    function renderAnswerTable(answers, answerKey) {
+                        if (!Array.isArray(answers) || answers.length === 0) return '<em>None</em>';
+                        let table = '<form class="editable-answer-table-form"><table class="answer-table" style="border-collapse:collapse; margin-top:0.5em;">';
+                        table += '<tr><th style="padding:2px 8px;">Question#</th><th style="padding:2px 8px;">Student Response</th></tr>';
+                        for (let i = 0; i < answers.length; i++) {
+                            let a = answers[i];
+                            let qnum = a.question || (i+1);
+                            let val = a.value || a.answer || a;
+                            let keyVal = answerKey && answerKey[qnum] ? answerKey[qnum] : null;
+                            let correct = (keyVal !== null && keyVal !== undefined && val) ? (val.trim().toUpperCase() === keyVal.trim().toUpperCase()) : null;
+                            let color = correct === true ? '#c8f7c5' : (correct === false ? '#f7c5c5' : '');
+                            table += `<tr><td style="padding:2px 8px;">${qnum}</td><td style="padding:2px 8px; background:${color}"><input type="text" name="answer_${qnum}" value="${val || ''}" maxlength="2" style="width:2em;text-align:center;"></td></tr>`;
+                        }
+                        table += '</table>';
+                        table += '<button type="button" class="rescore-btn" style="margin-top:0.7em;">Rescore</button>';
+                        table += '</form>';
+                        return table;
+                    }
+                    // Parse answer key if present
+                    let answerKey = null;
+                    if (result.answer_key && typeof result.answer_key === 'string') {
+                        answerKey = {};
+                        let parts = result.answer_key.split(',');
+                        for (let p of parts) {
+                            p = p.trim();
+                            if (p.includes(':')) {
+                                let colonParts = p.split(':');
+                                if (colonParts.length >= 2) {
+                                    let q = colonParts[0].trim();
+                                    let a = colonParts.slice(1).join(':').trim();
+                                    if (q && a) {
+                                        try {
+                                            answerKey[parseInt(q)] = a.toUpperCase();
+                                        } catch (e) {
+                                            continue; // Skip invalid question numbers
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    answersDiv.innerHTML += renderAnswerTable(result.answers, answerKey);
+                    // Add event listener for rescore button
+                    setTimeout(() => {
+                        const form = answersDiv.querySelector('.editable-answer-table-form');
+                        if (form) {
+                            const rescoreBtn = form.querySelector('.rescore-btn');
+                            rescoreBtn.addEventListener('click', function() {
+                                // Collect edited answers
+                                const formData = new FormData(form);
+                                const editedAnswers = [];
+                                for (let i = 0; i < result.answers.length; i++) {
+                                    let a = result.answers[i];
+                                    let qnum = a.question || (i+1);
+                                    let val = formData.get('answer_' + qnum);
+                                    editedAnswers.push({question: qnum, answer: val});
+                                }
+                                // TODO: Send editedAnswers to backend for regrading (implement endpoint)
+                                alert('Edited answers saved! (Rescore logic to be implemented)');
+                            });
+                        }
+                    }, 0);
+                    sheetDiv.appendChild(answersDiv);
+                    resultsContainer.appendChild(sheetDiv);
+                    // Draw overlay function
+                    function drawOverlay() {
+                        if (!canvas) return;
+                        const ctx = canvas.getContext('2d');
+                        ctx.clearRect(0,0,canvas.width,canvas.height);
+                        // If the image is scaled, scale overlays accordingly
+                        let scaleX = 1, scaleY = 1;
+                        if (img && img.naturalWidth && img.width) scaleX = img.width / img.naturalWidth;
+                        if (img && img.naturalHeight && img.height) scaleY = img.height / img.naturalHeight;
+                        roiRects.forEach((roi, i) => {
+                            ctx.save();
+                            // Use distinct color and opacity for each ROI
+                            ctx.globalAlpha = 0.7;
+                            ctx.strokeStyle = roi.color;
+                            ctx.fillStyle = roi.color;
+                            ctx.lineWidth = 3;
+                            // Scale ROI for display if needed
+                            let [x, y, w, h] = roi.rect;
+                            x *= scaleX; y *= scaleY; w *= scaleX; h *= scaleY;
+                            ctx.strokeRect(x, y, w, h);
+                            ctx.font = 'bold 20px sans-serif';
+                            ctx.fillText(roi.label, x+4, y+24);
+                            // Draw grid using correct rows/cols for answer ROIs
+                            if (roi.rows > 1) {
+                                let row_h = h / roi.rows;
+                                for (let j = 1; j < roi.rows; j++) {
+                                    ctx.beginPath();
+                                    ctx.moveTo(x, y + j * row_h);
+                                    ctx.lineTo(x + w, y + j * row_h);
+                                    ctx.strokeStyle = roi.color;
+                                    ctx.globalAlpha = 0.3;
+                                    ctx.lineWidth = 1;
+                                    ctx.stroke();
+                                }
+                            }
+                            if (roi.cols > 1) {
+                                let col_w = w / roi.cols;
+                                for (let j = 1; j < roi.cols; j++) {
+                                    ctx.beginPath();
+                                    ctx.moveTo(x + j * col_w, y);
+                                    ctx.lineTo(x + j * col_w, y + h);
+                                    ctx.strokeStyle = roi.color;
+                                    ctx.globalAlpha = 0.3;
+                                    ctx.lineWidth = 1;
+                                    ctx.stroke();
+                                }
+                            }
+                            ctx.restore();
+                        });
+                    }
+                    // No drag logic: overlays are fixed and not draggable
+                }
+            }); // end results.forEach
+        } // end displayResults
+    }); // end DOMContentLoaded
+    </script>
+</body>
+</html>

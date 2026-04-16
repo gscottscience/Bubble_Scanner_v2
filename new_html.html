@@ -1,0 +1,1712 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Answer Sheet Scanner</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select, textarea { width: 100%; padding: 8px; box-sizing: border-box; }
+        button { background-color: #4CAF50; color: white; padding: 10px 20px; border: none; cursor: pointer; }
+        button:hover { background-color: #45a049; }
+        .checkbox-group { display: flex; align-items: center; }
+        .checkbox-group input { width: auto; margin-right: 10px; }
+        .notification { 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 4px; 
+            background-color: #d4edda; 
+            color: #155724; 
+            display: none;
+        }
+        .error-notification {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .key-info {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 5px;
+        }
+        .answer-key-container {
+            position: relative;
+        }
+        .paste-button {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+        .paste-button:hover {
+            background-color: #0056b3;
+        }
+        .save-button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        .save-button:hover {
+            background-color: #218838;
+        }
+        .format-hint {
+            font-size: 0.75em;
+            color: #666;
+            margin-top: 5px;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .results {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            display: none;
+        }
+        .results h2 {
+            margin-top: 0;
+        }
+        .results table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        .results th, .results td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .results th {
+            background-color: #f2f2f2;
+        }
+        .correct {
+            background-color: #d4edda;
+        }
+        .incorrect {
+            background-color: #f8d7da;
+        }
+        .processing {
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .canvas-container {
+            margin-top: 20px;
+            text-align: center;
+            display: none;
+        }
+        .canvas-container canvas {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        .export-buttons {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        .export-button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+        .export-button:hover {
+            background-color: #0056b3;
+        }
+        .page-navigation {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .page-navigation button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            margin: 0 5px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .page-navigation button:hover {
+            background-color: #0056b3;
+        }
+        .page-navigation button.active {
+            background-color: #28a745;
+        }
+        .page-info {
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .detection-settings {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+        }
+        .detection-settings h3 {
+            margin-top: 0;
+        }
+        .slider-container {
+            margin: 10px 0;
+        }
+        .slider-container label {
+            display: inline-block;
+            width: 200px;
+        }
+        .slider-container input {
+            width: 200px;
+            display: inline-block;
+        }
+        .slider-value {
+            margin-left: 10px;
+            font-weight: bold;
+        }
+        .legend {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .legend h4 {
+            margin-top: 0;
+        }
+        .legend p {
+            margin: 5px 0;
+        }
+        .legend-color {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+        .debug-buttons {
+            margin-top: 10px;
+        }
+        .debug-buttons button {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            margin-right: 5px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+        .debug-buttons button:hover {
+            background-color: #5a6268;
+        }
+        .region-editor {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            display: none;
+        }
+        .region-editor h3 {
+            margin-top: 0;
+        }
+        .region-tabs {
+            display: flex;
+            margin-bottom: 15px;
+        }
+        .region-tab {
+            padding: 8px 15px;
+            background-color: #e9ecef;
+            border: 1px solid #dee2e6;
+            cursor: pointer;
+            border-radius: 3px 3px 0 0;
+            margin-right: 5px;
+        }
+        .region-tab.active {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        .region-content {
+            display: none;
+        }
+        .region-content.active {
+            display: block;
+        }
+        .region-inputs {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .region-inputs div {
+            display: flex;
+            flex-direction: column;
+        }
+        .region-inputs label {
+            font-size: 0.8em;
+            margin-bottom: 5px;
+        }
+        .region-inputs input {
+            padding: 5px;
+        }
+        .region-buttons {
+            margin-top: 10px;
+        }
+        .region-buttons button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            margin-right: 5px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+        .region-buttons button:hover {
+            background-color: #0056b3;
+        }
+        .region-list {
+            margin-top: 15px;
+        }
+        .region-item {
+            padding: 10px;
+            background-color: #e9ecef;
+            border-radius: 3px;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .region-item button {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 3px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+        .region-item button:hover {
+            background-color: #c82333;
+        }
+        .answer-region-form {
+            background-color: #e9ecef;
+            padding: 10px;
+            border-radius: 3px;
+            margin-bottom: 10px;
+        }
+        .answer-region-form h4 {
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+        .answer-region-inputs {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .answer-region-inputs div {
+            display: flex;
+            flex-direction: column;
+        }
+        .answer-region-inputs label {
+            font-size: 0.8em;
+            margin-bottom: 5px;
+        }
+        .answer-region-inputs input {
+            padding: 5px;
+        }
+        .answer-region-buttons {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Answer Sheet Scanner</h1>
+        
+        <div id="notification" class="notification">
+            Answer key loaded from previous use.
+        </div>
+        
+        <div id="error-notification" class="notification error-notification">
+            Error loading answer key. Please enter and save a new one.
+        </div>
+        
+        <form id="uploadForm">
+            <div class="form-group">
+                <label for="file">Student Answer Sheet Upload:</label>
+                <input type="file" name="file" accept=".pdf" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="test_type">Choose Test:</label>
+                <select name="test_type" id="test_type" required>
+                    <option value="Dictionary Skills">Dictionary Skills</option>
+                    <option value="Art">Art</option>
+                    <option value="Listening">Listening</option>
+                    <option value="Science">Science</option>
+                    <option value="Chess Puzzle">Chess Puzzle</option>
+                    <option value="Mathematics">Mathematics</option>
+                    <option value="Social Studies">Social Studies</option>
+                    <option value="Maps/Graphs/Charts">Maps/Graphs/Charts</option>
+                </select>
+            </div>
+            
+            <div class="form-group checkbox-group">
+                <input type="checkbox" name="grade" id="grade">
+                <label for="grade">Grade the tests?</label>
+            </div>
+            
+            <div class="form-group" id="answer_key_group" style="display: none;">
+                <label for="answer_key">Answer Key:</label>
+                <div class="answer-key-container">
+                    <textarea name="answer_key" id="answer_key" rows="4" placeholder="Paste your answer key here..."></textarea>
+                    <button type="button" class="paste-button" onclick="pasteFromClipboard()">Paste</button>
+                </div>
+                <div class="format-hint">
+                    Format: 1:A,2:B,3:C,... (e.g., "1:A,2:B,3:C,4:D,5:E")
+                </div>
+                <div class="button-group">
+                    <button type="button" class="save-button" onclick="saveAnswerKey()">Save Answer Key</button>
+                    <button type="button" class="paste-button" style="position: static; width: auto;" onclick="clearAnswerKey()">Clear</button>
+                </div>
+                <div id="key_info" class="key-info"></div>
+            </div>
+            
+            <button type="submit">Process Answer Sheets</button>
+        </form>
+        
+        <div id="detection-settings" class="detection-settings" style="display: none;">
+            <h3>Detection Settings</h3>
+            <div class="slider-container">
+                <label>Bubble Detection Threshold:</label>
+                <input type="range" id="threshold-slider" min="0" max="255" value="128">
+                <span class="slider-value" id="threshold-value">128</span>
+            </div>
+            <div class="slider-container">
+                <label>Minimum Fill Percentage:</label>
+                <input type="range" id="fill-slider" min="0" max="100" value="30">
+                <span class="slider-value" id="fill-value">30%</span>
+            </div>
+            <div class="slider-container">
+                <label>Contrast Enhancement:</label>
+                <input type="range" id="contrast-slider" min="1" max="3" step="0.1" value="1.5">
+                <span class="slider-value" id="contrast-value">1.5</span>
+            </div>
+            <div class="slider-container">
+                <label>Bubble Size Threshold:</label>
+                <input type="range" id="size-slider" min="5" max="50" value="15">
+                <span class="slider-value" id="size-value">15</span>
+            </div>
+            <button onclick="reprocessWithSettings()">Reprocess with New Settings</button>
+        </div>
+        
+        <div id="region-editor" class="region-editor">
+            <h3>Region Editor</h3>
+            <p>Adjust the coordinates of the detection regions to match your answer sheet.</p>
+            
+            <div class="region-tabs">
+                <div class="region-tab active" onclick="switchTab('id')">ID Region</div>
+                <div class="region-tab" onclick="switchTab('answer')">Answer Regions</div>
+            </div>
+            
+            <div id="id-tab" class="region-content active">
+                <h4>ID Region Settings</h4>
+                <div class="region-inputs">
+                    <div>
+                        <label for="id-x">X Position (%)</label>
+                        <input type="number" id="id-x" min="0" max="100" step="0.1" value="10">
+                    </div>
+                    <div>
+                        <label for="id-y">Y Position (%)</label>
+                        <input type="number" id="id-y" min="0" max="100" step="0.1" value="5">
+                    </div>
+                    <div>
+                        <label for="id-width">Width (%)</label>
+                        <input type="number" id="id-width" min="1" max="100" step="0.1" value="40">
+                    </div>
+                    <div>
+                        <label for="id-height">Height (%)</label>
+                        <input type="number" id="id-height" min="1" max="100" step="0.1" value="25">
+                    </div>
+                </div>
+                <div class="region-buttons">
+                    <button onclick="updateIdRegion()">Update ID Region</button>
+                    <button onclick="resetIdRegion()">Reset to Default</button>
+                </div>
+            </div>
+            
+            <div id="answer-tab" class="region-content">
+                <h4>Answer Regions</h4>
+                
+                <div class="answer-region-form">
+                    <h4>Add New Answer Region</h4>
+                    <div class="answer-region-inputs">
+                        <div>
+                            <label for="new-start-q">Start Question</label>
+                            <input type="number" id="new-start-q" min="1" value="1">
+                        </div>
+                        <div>
+                            <label for="new-end-q">End Question</label>
+                            <input type="number" id="new-end-q" min="1" value="10">
+                        </div>
+                        <div>
+                            <label for="new-rows">Rows</label>
+                            <input type="number" id="new-rows" min="1" value="5">
+                        </div>
+                        <div>
+                            <label for="new-cols">Columns</label>
+                            <input type="number" id="new-cols" min="1" value="2">
+                        </div>
+                        <div>
+                            <label for="new-x">X Position (%)</label>
+                            <input type="number" id="new-x" min="0" max="100" step="0.1" value="10">
+                        </div>
+                        <div>
+                            <label for="new-y">Y Position (%)</label>
+                            <input type="number" id="new-y" min="0" max="100" step="0.1" value="30">
+                        </div>
+                        <div>
+                            <label for="new-width">Width (%)</label>
+                            <input type="number" id="new-width" min="1" max="100" step="0.1" value="45">
+                        </div>
+                        <div>
+                            <label for="new-height">Height (%)</label>
+                            <input type="number" id="new-height" min="1" max="100" step="0.1" value="40">
+                        </div>
+                        <div>
+                            <label for="new-choices">Choices (comma-separated)</label>
+                            <input type="text" id="new-choices" value="A,B,C,D,E" placeholder="e.g., A,B,C,D">
+                        </div>
+                    </div>
+                    <div class="answer-region-buttons">
+                        <button onclick="addAnswerRegion()">Add Answer Region</button>
+                        <button onclick="clearAnswerRegionForm()">Clear Form</button>
+                    </div>
+                </div>
+                
+                <div class="region-list">
+                    <h4>Current Answer Regions:</h4>
+                    <div id="answer-regions-container"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="processing" class="processing">
+            <div class="spinner"></div>
+            <p>Processing answer sheet...</p>
+        </div>
+        
+        <div id="canvas-container" class="canvas-container">
+            <h3>Processed Pages</h3>
+            <div class="page-info" id="page-info"></div>
+            <div class="page-navigation" id="page-navigation"></div>
+            <canvas id="pdf-canvas"></canvas>
+            
+            <div class="legend">
+                <h4>Legend:</h4>
+                <p><span class="legend-color" style="background-color: #00FF00;"></span>Green Box: Student ID Region</p>
+                <p><span class="legend-color" style="background-color: #0000FF;"></span>Blue Box: Answer Region</p>
+                <p><span class="legend-color" style="background-color: rgba(255, 0, 0, 0.3);"></span>Red Overlay: Detected Filled Bubble</p>
+            </div>
+            
+            <div class="debug-buttons">
+                <button onclick="showOriginalImage()">Show Original Image</button>
+                <button onclick="showPreprocessedImage()">Show Preprocessed Image</button>
+                <button onclick="showEdgeDetection()">Show Edge Detection</button>
+                <button onclick="toggleRegionEditor()">Edit Regions</button>
+            </div>
+        </div>
+        
+        <div id="results" class="results">
+            <h2>Processing Results</h2>
+            <div id="resultsContent"></div>
+            <div class="export-buttons">
+                <button class="export-button" onclick="exportToCSV()">Export to CSV</button>
+                <button class="export-button" onclick="exportToExcel()">Export to Excel</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Set PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        
+        // Test configurations for different test types
+        const testConfigs = {
+            'Dictionary Skills': {
+                idRegion: { x: 0.1, y: 0.05, width: 0.4, height: 0.25 },
+                answerRegions: [
+                    { startQuestion: 1, endQuestion: 40, x: 0.1, y: 0.3, width: 0.9, height: 0.6, rows: 20, cols: 2, choices: ['A', 'B', 'C', 'D', 'E'] }
+                ]
+            },
+            'Art': {
+                idRegion: { x: 0.1, y: 0.05, width: 0.4, height: 0.25 },
+                answerRegions: [
+                    { startQuestion: 1, endQuestion: 10, x: 0.1, y: 0.3, width: 0.45, height: 0.4, rows: 5, cols: 2, choices: ['A', 'B', 'C', 'D'] },
+                    { startQuestion: 11, endQuestion: 15, x: 0.1, y: 0.75, width: 0.45, height: 0.1, rows: 1, cols: 5, choices: ['T', 'F'] },
+                    { startQuestion: 16, endQuestion: 30, x: 0.55, y: 0.3, width: 0.45, height: 0.4, rows: 5, cols: 3, choices: ['A', 'B', 'C', 'D'] }
+                ]
+            }
+            // Add more test configurations as needed
+        };
+        
+        // Default configurations for resetting
+        const defaultConfigs = JSON.parse(JSON.stringify(testConfigs));
+        
+        // Global variables
+        let pdfDoc = null;
+        let pageImages = [];
+        let pageResults = [];
+        let currentPageIndex = 0;
+        let detectionSettings = {
+            threshold: 128,
+            minFillPercentage: 30,
+            contrast: 1.5,
+            bubbleSizeThreshold: 15
+        };
+        let currentTestType = '';
+        let regionEditorVisible = false;
+        let currentTab = 'id';
+        
+        // Show/hide answer key field based on grading checkbox
+        document.getElementById('grade').addEventListener('change', function() {
+            const answerKeyGroup = document.getElementById('answer_key_group');
+            if (this.checked) {
+                answerKeyGroup.style.display = 'block';
+                // Try to load saved answer key
+                loadAnswerKey();
+            } else {
+                answerKeyGroup.style.display = 'none';
+            }
+        });
+        
+        // Load answer key when test type changes
+        document.getElementById('test_type').addEventListener('change', function() {
+            if (document.getElementById('grade').checked) {
+                loadAnswerKey();
+            }
+        });
+        
+        // Setup sliders
+        document.getElementById('threshold-slider').addEventListener('input', function() {
+            detectionSettings.threshold = parseInt(this.value);
+            document.getElementById('threshold-value').textContent = this.value;
+        });
+        
+        document.getElementById('fill-slider').addEventListener('input', function() {
+            detectionSettings.minFillPercentage = parseInt(this.value);
+            document.getElementById('fill-value').textContent = this.value + '%';
+        });
+        
+        document.getElementById('contrast-slider').addEventListener('input', function() {
+            detectionSettings.contrast = parseFloat(this.value);
+            document.getElementById('contrast-value').textContent = this.value;
+        });
+        
+        document.getElementById('size-slider').addEventListener('input', function() {
+            detectionSettings.bubbleSizeThreshold = parseInt(this.value);
+            document.getElementById('size-value').textContent = this.value;
+        });
+        
+        // Load answer key from localStorage
+        function loadAnswerKey() {
+            const testType = document.getElementById('test_type').value;
+            const answerKeyTextarea = document.getElementById('answer_key');
+            const keyInfo = document.getElementById('key_info');
+            const notification = document.getElementById('notification');
+            const errorNotification = document.getElementById('error-notification');
+            
+            // Hide both notifications initially
+            notification.style.display = 'none';
+            errorNotification.style.display = 'none';
+            
+            // Try to get from localStorage
+            const savedKey = localStorage.getItem(`answerKey_${testType}`);
+            
+            if (savedKey) {
+                answerKeyTextarea.value = savedKey;
+                keyInfo.textContent = 'Previous answer key loaded.';
+                
+                notification.style.display = 'block';
+                // Hide notification after 3 seconds
+                setTimeout(() => {
+                    notification.style.display = 'none';
+                }, 3000);
+            } else {
+                answerKeyTextarea.value = '';
+                keyInfo.textContent = 'No previous answer key found. Please enter and save a new one.';
+            }
+        }
+        
+        // Save answer key to localStorage
+        function saveAnswerKey() {
+            const testType = document.getElementById('test_type').value;
+            const answerKey = document.getElementById('answer_key').value.trim();
+            const keyInfo = document.getElementById('key_info');
+            const notification = document.getElementById('notification');
+            const errorNotification = document.getElementById('error-notification');
+            
+            if (!answerKey) {
+                alert('Please enter an answer key before saving.');
+                return;
+            }
+            
+            // Validate the answer key format
+            if (!validateAnswerKey(answerKey)) {
+                alert('Invalid answer key format. Please use the format: 1:A,2:B,3:C,...');
+                return;
+            }
+            
+            // Save to localStorage
+            localStorage.setItem(`answerKey_${testType}`, answerKey);
+            
+            // Update the last used info
+            const now = new Date();
+            const formattedDate = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
+            keyInfo.textContent = `Saved: ${formattedDate}`;
+            
+            // Show success notification
+            notification.textContent = 'Answer key saved successfully!';
+            notification.style.display = 'block';
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
+        }
+        
+        // Function to validate answer key format
+        function validateAnswerKey(key) {
+            // Basic validation: check if it contains at least one "number:letter" pair
+            const pattern = /\d+:[A-Za-z]/;
+            return pattern.test(key);
+        }
+        
+        // Function to clear the answer key
+        function clearAnswerKey() {
+            if (confirm('Are you sure you want to clear the answer key?')) {
+                document.getElementById('answer_key').value = '';
+                document.getElementById('key_info').textContent = '';
+            }
+        }
+        
+        // Function to paste from clipboard
+        async function pasteFromClipboard() {
+            try {
+                const text = await navigator.clipboard.readText();
+                document.getElementById('answer_key').value = text;
+                
+                // Show a brief confirmation
+                const pasteButton = document.querySelector('.paste-button');
+                const originalText = pasteButton.textContent;
+                pasteButton.textContent = 'Pasted!';
+                pasteButton.style.backgroundColor = '#28a745';
+                
+                setTimeout(() => {
+                    pasteButton.textContent = originalText;
+                    pasteButton.style.backgroundColor = '#007bff';
+                }, 1000);
+            } catch (err) {
+                console.error('Failed to read clipboard contents: ', err);
+                alert('Unable to paste from clipboard. Please paste manually using Ctrl+V (Cmd+V on Mac).');
+            }
+        }
+        
+        // Handle form submission
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Get form data
+            const formData = new FormData(this);
+            const testType = formData.get('test_type');
+            currentTestType = testType;
+            const file = formData.get('file');
+            const grade = formData.has('grade');
+            const answerKey = formData.get('answer_key');
+            
+            // Show processing indicator
+            document.getElementById('processing').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('canvas-container').style.display = 'none';
+            document.getElementById('detection-settings').style.display = 'none';
+            document.getElementById('region-editor').style.display = 'none';
+            
+            // Process the PDF
+            processPDF(file, testType, grade, answerKey);
+        });
+        
+        // Process PDF file
+        function processPDF(file, testType, grade, answerKey) {
+            const fileReader = new FileReader();
+            
+            fileReader.onload = function() {
+                const typedarray = new Uint8Array(this.result);
+                
+                // Load the PDF
+                pdfjsLib.getDocument(typedarray).promise.then(function(pdf) {
+                    pdfDoc = pdf;
+                    pageImages = [];
+                    pageResults = [];
+                    
+                    // Process all pages
+                    const promises = [];
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        promises.push(processPage(i, testType));
+                    }
+                    
+                    Promise.all(promises).then(function() {
+                        // Hide processing indicator
+                        document.getElementById('processing').style.display = 'none';
+                        
+                        // Show the canvas container
+                        document.getElementById('canvas-container').style.display = 'block';
+                        document.getElementById('detection-settings').style.display = 'block';
+                        
+                        // Setup page navigation
+                        setupPageNavigation();
+                        
+                        // Show first page
+                        showPage(0);
+                        
+                        // Display results
+                        displayResults(testType, grade, answerKey);
+                    });
+                }).catch(function(error) {
+                    console.error('Error loading PDF:', error);
+                    document.getElementById('processing').style.display = 'none';
+                    alert('Error processing PDF. Please make sure it\'s a valid PDF file.');
+                });
+            };
+            
+            fileReader.readAsArrayBuffer(file);
+        }
+        
+        // Process a single page
+        function processPage(pageNum, testType) {
+            return pdfDoc.getPage(pageNum).then(function(page) {
+                // Get the viewport with higher resolution for better OCR
+                const viewport = page.getViewport({ scale: 3.0 });
+                
+                // Prepare canvas using PDF page dimensions
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                
+                // Render PDF page
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport
+                };
+                
+                return page.render(renderContext).promise.then(function() {
+                    // Store the page image
+                    pageImages[pageNum - 1] = canvas;
+                    
+                    // Extract answers from the rendered page
+                    const extractedAnswers = extractAnswersFromCanvas(canvas, testType);
+                    
+                    // Store the results for this page
+                    pageResults[pageNum - 1] = extractedAnswers;
+                    
+                    return extractedAnswers;
+                });
+            });
+        }
+        
+        // Setup page navigation
+        function setupPageNavigation() {
+            const navigation = document.getElementById('page-navigation');
+            navigation.innerHTML = '';
+            
+            for (let i = 0; i < pageImages.length; i++) {
+                const button = document.createElement('button');
+                button.textContent = i + 1;
+                button.onclick = function() { showPage(i); };
+                
+                if (i === 0) {
+                    button.classList.add('active');
+                }
+                
+                navigation.appendChild(button);
+            }
+        }
+        
+        // Show a specific page
+        function showPage(index) {
+            if (index < 0 || index >= pageImages.length) return;
+            
+            currentPageIndex = index;
+            
+            // Update navigation buttons
+            const buttons = document.querySelectorAll('.page-navigation button');
+            buttons.forEach((button, i) => {
+                if (i === index) {
+                    button.classList.add('active');
+                } else {
+                    button.classList.remove('active');
+                }
+            });
+            
+            // Update page info
+            document.getElementById('page-info').textContent = 
+                `Page ${index + 1} of ${pageImages.length} - Student ID: ${pageResults[index].studentId || 'Not detected'}`;
+            
+            // Show the page
+            const canvas = document.getElementById('pdf-canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = pageImages[index].width;
+            canvas.height = pageImages[index].height;
+            context.drawImage(pageImages[index], 0, 0);
+            
+            // Draw detected bubbles
+            drawDetectedBubbles(context, pageResults[index], testConfigs[currentTestType]);
+        }
+        
+        // Draw detected bubbles on the canvas
+        function drawDetectedBubbles(context, results, config) {
+            if (!config) return;
+            
+            // Draw ID region
+            const idRegion = config.idRegion;
+            const idX = context.canvas.width * idRegion.x;
+            const idY = context.canvas.height * idRegion.y;
+            const idWidth = context.canvas.width * idRegion.width;
+            const idHeight = context.canvas.height * idRegion.height;
+            
+            context.strokeStyle = '#00FF00';
+            context.lineWidth = 2;
+            context.strokeRect(idX, idY, idWidth, idHeight);
+            
+            // Draw answer regions
+            for (const region of config.answerRegions) {
+                const regionX = context.canvas.width * region.x;
+                const regionY = context.canvas.height * region.y;
+                const regionWidth = context.canvas.width * region.width;
+                const regionHeight = context.canvas.height * region.height;
+                
+                context.strokeStyle = '#0000FF';
+                context.strokeRect(regionX, regionY, regionWidth, regionHeight);
+                
+                // Draw detected answer bubbles
+                const cellWidth = regionWidth / region.cols;
+                const cellHeight = regionHeight / region.rows;
+                const bubbleWidth = cellWidth / region.choices.length;
+                
+                for (let q = region.startQuestion; q <= region.endQuestion; q++) {
+                    const index = q - region.startQuestion;
+                    const row = Math.floor(index / region.cols);
+                    const col = index % region.cols;
+                    
+                    const cellX = regionX + col * cellWidth;
+                    const cellY = regionY + row * cellHeight;
+                    
+                    if (results.answers[q]) {
+                        const answerIndex = region.choices.indexOf(results.answers[q]);
+                        if (answerIndex !== -1) {
+                            const bubbleX = cellX + answerIndex * bubbleWidth;
+                            
+                            context.fillStyle = 'rgba(255, 0, 0, 0.3)';
+                            context.fillRect(bubbleX, cellY, bubbleWidth, cellHeight);
+                            
+                            context.strokeStyle = '#FF0000';
+                            context.lineWidth = 2;
+                            context.strokeRect(bubbleX, cellY, bubbleWidth, cellHeight);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Extract answers from the canvas
+        function extractAnswersFromCanvas(canvas, testType) {
+            const context = canvas.getContext('2d');
+            const config = testConfigs[testType];
+            
+            if (!config) {
+                console.error('No configuration found for test type:', testType);
+                return { studentId: null, answers: {} };
+            }
+            
+            // Preprocess the image for better detection
+            const preprocessedCanvas = preprocessImage(canvas);
+            const preprocessedContext = preprocessedCanvas.getContext('2d');
+            
+            const answers = {};
+            
+            // Extract student ID
+            const idRegion = config.idRegion;
+            const idX = preprocessedCanvas.width * idRegion.x;
+            const idY = preprocessedCanvas.height * idRegion.y;
+            const idWidth = preprocessedCanvas.width * idRegion.width;
+            const idHeight = preprocessedCanvas.height * idRegion.height;
+            
+            const studentId = extractStudentID(preprocessedContext, idX, idY, idWidth, idHeight);
+            
+            // Extract answers for each region
+            for (const region of config.answerRegions) {
+                const regionX = preprocessedCanvas.width * region.x;
+                const regionY = preprocessedCanvas.height * region.y;
+                const regionWidth = preprocessedCanvas.width * region.width;
+                const regionHeight = preprocessedCanvas.height * region.height;
+                
+                const regionAnswers = extractAnswersFromRegion(
+                    preprocessedContext, 
+                    regionX, 
+                    regionY, 
+                    regionWidth, 
+                    regionHeight, 
+                    region.startQuestion, 
+                    region.endQuestion, 
+                    region.rows, 
+                    region.cols, 
+                    region.choices
+                );
+                
+                Object.assign(answers, regionAnswers);
+            }
+            
+            return { studentId, answers };
+        }
+        
+        // Preprocess the image for better bubble detection
+        function preprocessImage(canvas) {
+            const preprocessedCanvas = document.createElement('canvas');
+            const preprocessedContext = preprocessedCanvas.getContext('2d');
+            preprocessedCanvas.width = canvas.width;
+            preprocessedCanvas.height = canvas.height;
+            
+            // Draw the original image
+            preprocessedContext.drawImage(canvas, 0, 0);
+            
+            // Get the image data
+            const imageData = preprocessedContext.getImageData(0, 0, preprocessedCanvas.width, preprocessedCanvas.height);
+            const data = imageData.data;
+            
+            // Apply contrast enhancement
+            const contrast = detectionSettings.contrast;
+            const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+            
+            // Convert to grayscale and apply threshold
+            for (let i = 0; i < data.length; i += 4) {
+                // Convert to grayscale
+                const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+                
+                // Apply contrast
+                const enhanced = factor * (gray - 128) + 128;
+                
+                // Clamp values
+                const clamped = Math.max(0, Math.min(255, enhanced));
+                
+                // Apply threshold
+                const value = clamped < detectionSettings.threshold ? 0 : 255;
+                
+                data[i] = value;     // R
+                data[i + 1] = value; // G
+                data[i + 2] = value; // B
+                // Alpha channel (data[i + 3]) remains unchanged
+            }
+            
+            // Put the processed image data back
+            preprocessedContext.putImageData(imageData, 0, 0);
+            
+            return preprocessedCanvas;
+        }
+        
+        // Extract student ID from the ID region
+        function extractStudentID(context, x, y, width, height) {
+            const imageData = context.getImageData(x, y, width, height);
+            const data = imageData.data;
+            
+            // Simple bubble detection for ID (4 digits, 10 bubbles each)
+            const digitWidth = width / 4;
+            const bubbleHeight = height / 10;
+            let studentId = '';
+            
+            for (let digit = 0; digit < 4; digit++) {
+                let maxFilledRatio = 0;
+                let selectedDigit = '?';
+                
+                for (let num = 0; num < 10; num++) {
+                    const bubbleY = y + num * bubbleHeight;
+                    const bubbleX = x + digit * digitWidth;
+                    
+                    // Calculate filled ratio for this bubble
+                    const filledRatio = calculateFilledRatio(context, bubbleX, bubbleY, digitWidth, bubbleHeight);
+                    
+                    if (filledRatio > maxFilledRatio) {
+                        maxFilledRatio = filledRatio;
+                        selectedDigit = num.toString();
+                    }
+                }
+                
+                // Only add the digit if it's significantly filled
+                if (maxFilledRatio > detectionSettings.minFillPercentage / 100) {
+                    studentId += selectedDigit;
+                } else {
+                    studentId += '?';
+                }
+            }
+            
+            return studentId;
+        }
+        
+        // Extract answers from a region
+        function extractAnswersFromRegion(context, x, y, width, height, startQuestion, endQuestion, rows, cols, choices) {
+            const answers = {};
+            const cellWidth = width / cols;
+            const cellHeight = height / rows;
+            const bubbleWidth = cellWidth / choices.length;
+            
+            for (let q = startQuestion; q <= endQuestion; q++) {
+                const index = q - startQuestion;
+                const row = Math.floor(index / cols);
+                const col = index % cols;
+                
+                const cellX = x + col * cellWidth;
+                const cellY = y + row * cellHeight;
+                
+                // Find the filled bubble in this cell
+                let maxFilledRatio = 0;
+                let selectedAnswer = null;
+                
+                for (let i = 0; i < choices.length; i++) {
+                    const bubbleX = cellX + i * bubbleWidth;
+                    const filledRatio = calculateFilledRatio(context, bubbleX, cellY, bubbleWidth, cellHeight);
+                    
+                    if (filledRatio > maxFilledRatio) {
+                        maxFilledRatio = filledRatio;
+                        selectedAnswer = choices[i];
+                    }
+                }
+                
+                // Only add the answer if it's significantly filled
+                if (maxFilledRatio > detectionSettings.minFillPercentage / 100) {
+                    answers[q] = selectedAnswer;
+                } else {
+                    answers[q] = null; // No answer selected
+                }
+            }
+            
+            return answers;
+        }
+        
+        // Calculate the filled ratio of a bubble using contour detection
+        function calculateFilledRatio(context, x, y, width, height) {
+            // Get the image data for the bubble area
+            const imageData = context.getImageData(x, y, width, height);
+            const data = imageData.data;
+            
+            // Create a temporary canvas for contour detection
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = width;
+            tempCanvas.height = height;
+            const tempContext = tempCanvas.getContext('2d');
+            tempContext.putImageData(imageData, 0, 0);
+            
+            // Count black pixels (filled areas)
+            let filledPixels = 0;
+            let totalPixels = 0;
+            
+            // Sample every 2nd pixel for better accuracy
+            for (let py = 0; py < height; py += 2) {
+                for (let px = 0; px < width; px += 2) {
+                    const idx = (py * width + px) * 4;
+                    
+                    // Check if pixel is black (filled) - in the preprocessed image, black is 0
+                    const r = data[idx];
+                    const g = data[idx + 1];
+                    const b = data[idx + 2];
+                    
+                    // Since we converted to binary, if all channels are 0, it's black
+                    if (r === 0 && g === 0 && b === 0) {
+                        filledPixels++;
+                    }
+                    
+                    totalPixels++;
+                }
+            }
+            
+            return filledPixels / totalPixels;
+        }
+        
+        // Show original image
+        function showOriginalImage() {
+            if (currentPageIndex < 0 || currentPageIndex >= pageImages.length) return;
+            
+            const canvas = document.getElementById('pdf-canvas');
+            const context = canvas.getContext('2d');
+            
+            // Get the current page image
+            const currentImage = pageImages[currentPageIndex];
+            
+            // Display the original image
+            canvas.width = currentImage.width;
+            canvas.height = currentImage.height;
+            context.drawImage(currentImage, 0, 0);
+            
+            // Redraw the detected bubbles
+            drawDetectedBubbles(context, pageResults[currentPageIndex], testConfigs[currentTestType]);
+        }
+        
+        // Show preprocessed image
+        function showPreprocessedImage() {
+            if (currentPageIndex < 0 || currentPageIndex >= pageImages.length) return;
+            
+            const canvas = document.getElementById('pdf-canvas');
+            const context = canvas.getContext('2d');
+            
+            // Get the current page image
+            const currentImage = pageImages[currentPageIndex];
+            
+            // Preprocess the image
+            const preprocessedCanvas = preprocessImage(currentImage);
+            
+            // Display the preprocessed image
+            canvas.width = preprocessedCanvas.width;
+            canvas.height = preprocessedCanvas.height;
+            context.drawImage(preprocessedCanvas, 0, 0);
+        }
+        
+        // Show edge detection
+        function showEdgeDetection() {
+            if (currentPageIndex < 0 || currentPageIndex >= pageImages.length) return;
+            
+            const canvas = document.getElementById('pdf-canvas');
+            const context = canvas.getContext('2d');
+            
+            // Get the current page image
+            const currentImage = pageImages[currentPageIndex];
+            
+            // Preprocess the image
+            const preprocessedCanvas = preprocessImage(currentImage);
+            const preprocessedContext = preprocessedCanvas.getContext('2d');
+            
+            // Get the image data
+            const imageData = preprocessedContext.getImageData(0, 0, preprocessedCanvas.width, preprocessedCanvas.height);
+            const data = imageData.data;
+            
+            // Apply edge detection (simple Sobel operator)
+            const width = preprocessedCanvas.width;
+            const height = preprocessedCanvas.height;
+            const output = new Uint8ClampedArray(data.length);
+            
+            for (let y = 1; y < height - 1; y++) {
+                for (let x = 1; x < width - 1; x++) {
+                    const idx = (y * width + x) * 4;
+                    
+                    // Get surrounding pixels
+                    const topLeft = ((y - 1) * width + (x - 1)) * 4;
+                    const top = ((y - 1) * width + x) * 4;
+                    const topRight = ((y - 1) * width + (x + 1)) * 4;
+                    const left = (y * width + (x - 1)) * 4;
+                    const right = (y * width + (x + 1)) * 4;
+                    const bottomLeft = ((y + 1) * width + (x - 1)) * 4;
+                    const bottom = ((y + 1) * width + x) * 4;
+                    const bottomRight = ((y + 1) * width + (x + 1)) * 4;
+                    
+                    // Apply Sobel operator
+                    const gx = (
+                        -1 * data[topLeft] + 1 * data[topRight] +
+                        -2 * data[left] + 2 * data[right] +
+                        -1 * data[bottomLeft] + 1 * data[bottomRight]
+                    );
+                    
+                    const gy = (
+                        -1 * data[topLeft] + -2 * data[top] + -1 * data[topRight] +
+                        1 * data[bottomLeft] + 2 * data[bottom] + 1 * data[bottomRight]
+                    );
+                    
+                    const magnitude = Math.sqrt(gx * gx + gy * gy);
+                    const edge = magnitude > 50 ? 255 : 0;
+                    
+                    output[idx] = edge;
+                    output[idx + 1] = edge;
+                    output[idx + 2] = edge;
+                    output[idx + 3] = 255;
+                }
+            }
+            
+            // Create new image data
+            const edgeImageData = new ImageData(output, width, height);
+            
+            // Display the edge detection
+            canvas.width = width;
+            canvas.height = height;
+            context.putImageData(edgeImageData, 0, 0);
+        }
+        
+        // Toggle region editor
+        function toggleRegionEditor() {
+            regionEditorVisible = !regionEditorVisible;
+            const editor = document.getElementById('region-editor');
+            
+            if (regionEditorVisible) {
+                editor.style.display = 'block';
+                updateRegionInputs();
+                updateAnswerRegionsList();
+            } else {
+                editor.style.display = 'none';
+            }
+        }
+        
+        // Switch between tabs
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            // Update tab buttons
+            const tabs = document.querySelectorAll('.region-tab');
+            tabs.forEach(tabElement => {
+                if (tabElement.textContent.toLowerCase().includes(tab)) {
+                    tabElement.classList.add('active');
+                } else {
+                    tabElement.classList.remove('active');
+                }
+            });
+            
+            // Update tab content
+            const contents = document.querySelectorAll('.region-content');
+            contents.forEach(content => {
+                if (content.id === `${tab}-tab`) {
+                    content.classList.add('active');
+                } else {
+                    content.classList.remove('active');
+                }
+            });
+        }
+        
+        // Update region inputs with current values
+        function updateRegionInputs() {
+            const config = testConfigs[currentTestType];
+            if (!config) return;
+            
+            // Update ID region inputs
+            document.getElementById('id-x').value = Math.round(config.idRegion.x * 100);
+            document.getElementById('id-y').value = Math.round(config.idRegion.y * 100);
+            document.getElementById('id-width').value = Math.round(config.idRegion.width * 100);
+            document.getElementById('id-height').value = Math.round(config.idRegion.height * 100);
+        }
+        
+        // Update ID region
+        function updateIdRegion() {
+            const config = testConfigs[currentTestType];
+            if (!config) return;
+            
+            const x = parseFloat(document.getElementById('id-x').value) / 100;
+            const y = parseFloat(document.getElementById('id-y').value) / 100;
+            const width = parseFloat(document.getElementById('id-width').value) / 100;
+            const height = parseFloat(document.getElementById('id-height').value) / 100;
+            
+            // Validate values
+            if (x < 0 || x > 1 || y < 0 || y > 1 || width <= 0 || width > 1 || height <= 0 || height > 1) {
+                alert('Invalid values. Please enter values between 0 and 100.');
+                return;
+            }
+            
+            config.idRegion = { x, y, width, height };
+            
+            // Show the updated region
+            showPage(currentPageIndex);
+        }
+        
+        // Reset ID region to default
+        function resetIdRegion() {
+            const config = testConfigs[currentTestType];
+            const defaultConfig = defaultConfigs[currentTestType];
+            
+            if (!config || !defaultConfig) return;
+            
+            config.idRegion = JSON.parse(JSON.stringify(defaultConfig.idRegion));
+            
+            // Update inputs
+            updateRegionInputs();
+            
+            // Show the updated region
+            showPage(currentPageIndex);
+        }
+        
+        // Add answer region
+        function addAnswerRegion() {
+            const config = testConfigs[currentTestType];
+            if (!config) return;
+            
+            const startQuestion = parseInt(document.getElementById('new-start-q').value);
+            const endQuestion = parseInt(document.getElementById('new-end-q').value);
+            const rows = parseInt(document.getElementById('new-rows').value);
+            const cols = parseInt(document.getElementById('new-cols').value);
+            const x = parseFloat(document.getElementById('new-x').value) / 100;
+            const y = parseFloat(document.getElementById('new-y').value) / 100;
+            const width = parseFloat(document.getElementById('new-width').value) / 100;
+            const height = parseFloat(document.getElementById('new-height').value) / 100;
+            const choicesInput = document.getElementById('new-choices').value || '';
+            const choices = choicesInput.split(',').map(c => c.trim()).filter(c => c.length > 0);
+            
+            // Validate values
+            if (startQuestion < 1 || endQuestion < startQuestion || rows < 1 || cols < 1 ||
+                x < 0 || x > 1 || y < 0 || y > 1 || width <= 0 || width > 1 || height <= 0 || height > 1) {
+                alert('Invalid values. Please check your inputs.');
+                return;
+            }
+            
+            // Add the new region
+            config.answerRegions.push({
+                startQuestion,
+                endQuestion,
+                x, y, width, height,
+                rows, cols, choices
+            });
+            
+            // Update the list
+            updateAnswerRegionsList();
+            
+            // Clear the form
+            clearAnswerRegionForm();
+            
+            // Show the updated region
+            showPage(currentPageIndex);
+        }
+        
+        // Clear answer region form
+        function clearAnswerRegionForm() {
+            document.getElementById('new-start-q').value = '1';
+            document.getElementById('new-end-q').value = '10';
+            document.getElementById('new-rows').value = '5';
+            document.getElementById('new-cols').value = '2';
+            document.getElementById('new-x').value = '10';
+            document.getElementById('new-y').value = '30';
+            document.getElementById('new-width').value = '45';
+            document.getElementById('new-height').value = '40';
+            document.getElementById('new-choices').value = 'A,B,C,D,E';
+        }
+        
+        // Update answer regions list
+        function updateAnswerRegionsList() {
+            const config = testConfigs[currentTestType];
+            if (!config) return;
+            
+            const container = document.getElementById('answer-regions-container');
+            container.innerHTML = '';
+            
+            config.answerRegions.forEach((region, index) => {
+                const item = document.createElement('div');
+                item.className = 'region-item';
+                item.innerHTML = `
+                    <span>Region ${index + 1}: Q${region.startQuestion}-${region.endQuestion}, X=${Math.round(region.x * 100)}%, Y=${Math.round(region.y * 100)}%, Width=${Math.round(region.width * 100)}%, Height=${Math.round(region.height * 100)}%</span>
+                    <button onclick="editAnswerRegion(${index})">Edit</button>
+                    <button onclick="removeAnswerRegion(${index})">Remove</button>
+                `;
+                container.appendChild(item);
+            });
+            
+            if (config.answerRegions.length === 0) {
+                container.innerHTML = '<p>No answer regions defined.</p>';
+            }
+        }
+        
+        // Edit answer region
+        function editAnswerRegion(index) {
+            const config = testConfigs[currentTestType];
+            if (!config || index < 0 || index >= config.answerRegions.length) return;
+            
+            const region = config.answerRegions[index];
+            
+            // Fill the form with current values
+            document.getElementById('new-start-q').value = region.startQuestion;
+            document.getElementById('new-end-q').value = region.endQuestion;
+            document.getElementById('new-rows').value = region.rows;
+            document.getElementById('new-cols').value = region.cols;
+            document.getElementById('new-x').value = Math.round(region.x * 100);
+            document.getElementById('new-y').value = Math.round(region.y * 100);
+            document.getElementById('new-width').value = Math.round(region.width * 100);
+            document.getElementById('new-height').value = Math.round(region.height * 100);
+            document.getElementById('new-choices').value = region.choices.join(',');
+            
+            // Remove the old region
+            config.answerRegions.splice(index, 1);
+            
+            // Update the list
+            updateAnswerRegionsList();
+            
+            // Switch to answer tab
+            switchTab('answer');
+        }
+        
+        // Remove answer region
+        function removeAnswerRegion(index) {
+            const config = testConfigs[currentTestType];
+            if (!config || index < 0 || index >= config.answerRegions.length) return;
+            
+            if (confirm('Are you sure you want to remove this answer region?')) {
+                config.answerRegions.splice(index, 1);
+                updateAnswerRegionsList();
+                showPage(currentPageIndex);
+            }
+        }
+        
+        // Reprocess with new settings
+        function reprocessWithSettings() {
+            if (!pdfDoc) return;
+            
+            // Get current form data
+            const testType = document.getElementById('test_type').value;
+            const grade = document.getElementById('grade').checked;
+            const answerKey = document.getElementById('answer_key').value;
+            
+            // Show processing indicator
+            document.getElementById('processing').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            
+            // Reprocess all pages
+            const promises = [];
+            for (let i = 1; i <= pdfDoc.numPages; i++) {
+                promises.push(reprocessPage(i, testType));
+            }
+            
+            Promise.all(promises).then(function() {
+                // Hide processing indicator
+                document.getElementById('processing').style.display = 'none';
+                
+                // Show current page
+                showPage(currentPageIndex);
+                
+                // Display results
+                displayResults(testType, grade, answerKey);
+            });
+        }
+        
+        // Reprocess a single page
+        function reprocessPage(pageNum, testType) {
+            return pdfDoc.getPage(pageNum).then(function(page) {
+                // Extract answers from the rendered page
+                const extractedAnswers = extractAnswersFromCanvas(pageImages[pageNum - 1], testType);
+                
+                // Store the results for this page
+                pageResults[pageNum - 1] = extractedAnswers;
+                
+                return extractedAnswers;
+            });
+        }
+        
+        // Display results
+        function displayResults(testType, grade, answerKey) {
+            const resultsDiv = document.getElementById('results');
+            const resultsContent = document.getElementById('resultsContent');
+            
+            let resultsHTML = '<h3>Results Summary</h3>';
+            
+            // Add summary for each page
+            for (let i = 0; i < pageResults.length; i++) {
+                const pageResult = pageResults[i];
+                resultsHTML += `
+                    <div class="page-result">
+                        <h4>Page ${i + 1} - Student ID: ${pageResult.studentId || 'Not detected'}</h4>
+                `;
+                
+                if (grade && answerKey && typeof answerKey === 'string') {
+                    // Parse the answer key
+                    const answerKeyMap = {};
+                    const pairs = answerKey.split(',');
+                    for (const pair of pairs) {
+                        const parts = pair.split(':');
+                        if (parts.length >= 2) {
+                            const question = parts[0].trim();
+                            const answer = parts.slice(1).join(':').trim();
+                            if (question && answer) {
+                                try {
+                                    answerKeyMap[parseInt(question)] = answer.toUpperCase();
+                                } catch (e) {
+                                    continue; // Skip invalid question numbers
+                                }
+                            }
+                        }
+                    }
+                    
+                    let correctCount = 0;
+                    let totalCount = 0;
+                    
+                    resultsHTML += `
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Question</th>
+                                    <th>Student Answer</th>
+                                    <th>Correct Answer</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+                    
+                    for (let q = 1; q <= 50; q++) {
+                        if (pageResult.answers[q] !== undefined) {
+                            totalCount++;
+                            const studentAnswer = pageResult.answers[q] || '-';
+                            const correctAnswer = answerKeyMap[q] || '-';
+                            const isCorrect = studentAnswer === correctAnswer;
+                            
+                            if (isCorrect) {
+                                correctCount++;
+                            }
+                            
+                            resultsHTML += `
+                                <tr class="${isCorrect ? 'correct' : 'incorrect'}">
+                                    <td>${q}</td>
+                                    <td>${studentAnswer}</td>
+                                    <td>${correctAnswer}</td>
+                                    <td>${isCorrect ? '✓ Correct' : '✗ Incorrect'}</td>
+                                </tr>
+                            `;
+                        }
+                    }
+                    
+                    const score = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
+                    resultsHTML += `
+                            </tbody>
+                        </table>
+                        <p>Score: ${score}% (${correctCount}/${totalCount})</p>
+                    `;
+                } else {
+                    resultsHTML += `
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Question</th>
+                                    <th>Answer</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+                    
+                    for (let q = 1; q <= 50; q++) {
+                        if (pageResult.answers[q] !== undefined) {
+                            resultsHTML += `
+                                <tr>
+                                    <td>${q}</td>
+                                    <td>${pageResult.answers[q] || '-'}</td>
+                                </tr>
+                            `;
+                        }
+                    }
+                    
+                    resultsHTML += `
+                            </tbody>
+                        </table>
+                    `;
+                }
+                
+                resultsHTML += '</div>';
+            }
+            
+            resultsContent.innerHTML = resultsHTML;
+            resultsDiv.style.display = 'block';
+            
+            // Store results for export
+            window.currentResults = {
+                testType,
+                pageResults,
+                grade,
+                answerKey
+            };
+        }
+        
+        // Export to CSV
+        function exportToCSV() {
+            if (!window.currentResults) {
+                alert('No results to export');
+                return;
+            }
+            
+            const { testType, pageResults, grade, answerKey } = window.currentResults;
+            
+            let csv = 'Page,Test Type,Student ID,Question,Student Answer';
+            
+            if (grade && answerKey) {
+                csv += ',Correct Answer,Status';
+            }
+            
+            csv += '\n';
+            
+            // Parse the answer key if grading
+            let answerKeyMap = {};
+            if (grade && answerKey && typeof answerKey === 'string') {
+                const pairs = answerKey.split(',');
+                for (const pair of pairs) {
+                    const parts = pair.split(':');
+                    if (parts.length >= 2) {
+                        const question = parts[0].trim();
+                        const answer = parts.slice(1).join(':').trim();
+                        if (question && answer) {
+                            try {
+                                answerKeyMap[parseInt(question)] = answer.toUpperCase();
+                            } catch (e) {
+                                continue; // Skip invalid question numbers
+                            }
+                        }
+                    }
+                }
+            }
+            
+            for (let i = 0; i < pageResults.length; i++) {
+                const pageResult = pageResults[i];
+                
+                for (let q = 1; q <= 50; q++) {
+                    if (pageResult.answers[q] !== undefined) {
+                        csv += `${i + 1},${testType},${pageResult.studentId || 'Not detected'},${q},${pageResult.answers[q] || '-'}`;
+                        
+                        if (grade && answerKey) {
+                            const correctAnswer = answerKeyMap[q] || '-';
+                            const isCorrect = pageResult.answers[q] === correctAnswer;
+                            csv += `,${correctAnswer},${isCorrect ? 'Correct' : 'Incorrect'}`;
+                        }
+                        
+                        csv += '\n';
+                    }
+                }
+            }
+            
+            // Create and download the CSV file
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `results_${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        // Export to Excel (simplified - creates a CSV that Excel can open)
+        function exportToExcel() {
+            // For simplicity, we'll create a CSV with Excel-specific formatting
+            exportToCSV();
+        }
+    </script>
+</body>
+</html>

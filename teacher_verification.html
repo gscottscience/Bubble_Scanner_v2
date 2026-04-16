@@ -1,0 +1,2533 @@
+<!-- All CSS is now inside the <style> block in <head> -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+                <style>
+                /* Print header and group header logic for vertical view */
+                @media print {
+                    .print-header-table {
+                        display: table;
+                        width: 100%;
+                        table-layout: fixed;
+                        page-break-after: avoid;
+                    }
+                    .print-header-table thead {
+                        display: table-header-group;
+                    }
+                    .print-grade-header {
+                        display: block;
+                        font-size: 1.3em;
+                        color: #495057 !important;
+                        margin: 0.5em 0 0.2em 0;
+                        page-break-after: avoid;
+                    }
+                    .vertical-view-container {
+                        page-break-before: always;
+                    }
+                    .grade-group {
+                        page-break-before: always;
+                    }
+                }
+                </style>
+            <!--
+            ===================== WARNING =====================
+            The sticky column and z-index CSS below is CRITICAL
+            for correct horizontal scrolling and sticky column behavior
+            in the Teacher Verification Report table.
+                <style>
+                /* Left-align Student ID# in vertical card header and printout */
+                .vertical-header-row {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+                .vertical-header-cell.id-label-cell,
+                .vertical-header-cell.id-value-cell {
+                    flex: 1 1 auto;
+                    text-align: left;
+                }
+                .vertical-header-cell.id-label-cell {
+                    font-size: 1.18em !important;
+                    font-weight: bold !important;
+                }
+                .vertical-header-cell.id-value-cell {
+                    font-size: 1.85em !important;
+                    font-weight: bold !important;
+                    letter-spacing: 0.03em;
+                    line-height: 1.1;
+                    margin-top: 0.1em;
+                    margin-bottom: 0.1em;
+                    text-align: left !important;
+                }
+                .vertical-student-id-value {
+                    font-size: 1.5em !important;
+                    font-weight: bold !important;
+                    display: block;
+                    text-align: left !important;
+                    margin: 0.05em 0 0.05em 0;
+                    letter-spacing: 0.03em;
+                }
+                @media print {
+                    .vertical-header-cell.id-label-cell {
+                        font-size: 1.18em !important;
+                        font-weight: bold !important;
+                        text-align: left !important;
+                    }
+                    .vertical-header-cell.id-value-cell,
+                    .vertical-student-id-value {
+                        font-size: 1.85em !important;
+                        font-weight: bold !important;
+                        text-align: left !important;
+                    }
+                }
+                .vertical-header-cell.score-cell,
+                .vertical-header-cell.incorrect-cell {
+                    flex: 0 0 auto;
+                    margin-left: 1em;
+                    text-align: right;
+                }
+                @media print {
+                    .vertical-header-cell.id-label-cell,
+                    .vertical-header-cell.id-value-cell {
+                        text-align: left !important;
+                    }
+                }
+                </style>
+            DO NOT MODIFY sticky column selectors, z-index, or
+            table structure without thoroughly testing:
+                - Sticky columns (first 4) always stay above Q columns
+                - No overlap or hiding of Student ID, Score, Correct, Incorrect
+                - Answer Key row remains above all data rows
+                - Grid lines and scrollbars remain visible
+            If you must change, TEST ALL SCROLLING AND PRINT VIEWS!
+            ====================================================
+            -->
+    <meta charset="UTF-8">
+    <title>Score Verification - Bubble Sheet Results</title>
+    <!-- SheetJS for Excel export -->
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+        <style>
+        /* Print-only and screen-only helpers */
+        @media print {
+            body {
+                margin-top: 0 !important;
+                padding-top: 0 !important;
+            }
+            .print-header-table,
+            .print-header-table th,
+            .print-school-header,
+            .print-test-header,
+            .print-grade-header,
+            .vertical-view-container > h2,
+            .vertical-view-container > h3 {
+                margin-top: 0 !important;
+                padding-top: 0 !important;
+            }
+            /* Remove top margin from first element after body */
+            body > *:first-child {
+                margin-top: 0 !important;
+                padding-top: 0 !important;
+            }
+            .screen-only { display: none !important; }
+            .print-only { display: block !important; }
+            .vertical-view-container { page-break-before: always; }
+            .print-header-table { display: block !important; margin-bottom: 0.1em !important; }
+            .print-school-header, .print-test-header, .print-grade-header {
+                display: block !important;
+                margin-bottom: 0.1em !important;
+                margin-top: 0.1em !important;
+                padding: 0 !important;
+            }
+            .vertical-student-card { page-break-inside: avoid; }
+        }
+        @media screen {
+            .print-only { display: none !important; }
+        }
+    .scroll-table-container {
+        overflow-x: auto !important;
+        overflow-y: auto !important;
+        max-width: 100%;
+        max-height: 500px;
+        border: 1px solid #dee2e6;
+        position: relative;
+    }
+    .scroll-table-container::-webkit-scrollbar-track {
+        background: #f5f8fa;
+        border-radius: 6px;
+    }
+    /* Ensure grid lines for horizontal view tables */
+    .scroll-table {
+        border-collapse: collapse !important;
+        width: 100%;
+        border: 1px solid #bcd !important;
+        background: #fff;
+    }
+    .scroll-table th, .scroll-table td {
+        border: 1px solid #bcd !important;
+        box-sizing: border-box;
+    }
+    .scroll-table thead th {
+        background: #f5f8fa;
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    }
+    /* Make answer key row sticky below the header */
+    .scroll-table .answer-key-row th, .scroll-table .answer-key-row td {
+        background: #d4edff !important;
+        font-weight: bold;
+    }
+        /* Print header for every page */
+        .print-header-table {
+            display: none;
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 0;
+        }
+        @media print {
+            .print-header-table {
+                display: table !important;
+                page-break-before: always !important;
+            }
+            .print-header-table thead tr {
+                display: table-header-group !important;
+            }
+            .print-header-table th {
+                text-align: center;
+                font-size: 2.2em;
+                color: #007bff;
+                font-weight: bold;
+                padding: 0.5em 0 0.5em 0;
+                background: #fff;
+                border: none;
+            }
+        }
+        .locked-table th.correct-cell, .locked-table td.correct-cell,
+        .scroll-table th.correct-cell, .scroll-table td.correct-cell {
+            width: 80px;
+            min-width: 80px;
+            max-width: 80px;
+            font-size: 0.85em;
+            padding: 4px 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            position: sticky;
+            left: 180px;
+            background: #f5f8fa;
+            z-index: 3;
+            box-shadow: 2px 0 2px -1px #bcd;
+        }
+        .locked-table th.incorrect-cell, .locked-table td.incorrect-cell,
+        .scroll-table th.incorrect-cell, .scroll-table td.incorrect-cell {
+            width: 100px;
+            min-width: 100px;
+            max-width: 100px;
+            font-size: 0.85em;
+            padding: 4px 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            position: sticky;
+            left: 260px;
+            background: #eaf3fb;
+            z-index: 3;
+            box-shadow: 2px 0 2px -1px #bcd;
+        }
+        .locked-table th.answer-cell, .locked-table td.answer-cell,
+        .scroll-table th.answer-cell, .scroll-table td.answer-cell {
+            min-width: 36px;
+            max-width: 36px;
+            width: 36px;
+            font-size: 15px;
+            padding: 4px 5px;
+        }
+        /* Print-specific overrides for compact table */
+        @media print {
+            /* Hide action buttons when printing */
+            .btn, button, .actions, .button-row, .print-controls {
+                display: none !important;
+            }
+            table.scroll-table {
+                width: 100% !important;
+                max-width: 100% !important;
+                table-layout: fixed !important;
+                font-size: 11px !important;
+            }
+            .scroll-table-container {
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    overflow-x: visible !important;
+                    overflow-y: visible !important;
+                    margin: 0 !important;
+                    border: none !important;
+                }
+            @page {
+                size: landscape;
+                margin: 0.4in 0.4in 0.3in 0.4in;
+            }
+            
+            /* Hide controls and summary to prevent blank first page */
+            .controls, .summary-stats, #summary-stats {
+                display: none !important;
+            }
+            
+            /* Make body margin 0 for print */
+            body {
+                margin: 0 !important;
+            }
+            
+            /* Remove sticky positioning for print */
+            th.student-id, td.student-id,
+            th.score-cell, td.score-cell,
+            th.correct-cell, td.correct-cell,
+            th.incorrect-cell, td.incorrect-cell {
+                position: static !important;
+                left: auto !important;
+                box-shadow: none !important;
+            }
+            
+            /* Make first 4 columns narrower for print to save space */
+            th.student-id, td.student-id {
+                width: 70px !important;
+                font-size: 11px !important;
+                padding: 2px 3px !important;
+            }
+            th.score-cell, td.score-cell {
+                width: 40px !important;
+                font-size: 11px !important;
+                padding: 2px 3px !important;
+            }
+            th.correct-cell, td.correct-cell {
+                width: 48px !important;
+                font-size: 11px !important;
+                padding: 2px 3px !important;
+            }
+            th.incorrect-cell, td.incorrect-cell {
+                width: 60px !important;
+                font-size: 11px !important;
+                padding: 2px 3px !important;
+            }
+            
+            /* Increase answer cell size for better readability */
+            /* Increase answer cell size for better readability */
+            th.answer-cell, td.answer-cell {
+                width: 34px !important;
+                font-size: 12px !important;
+                padding: 3px 4px !important;
+            }
+            
+            .incorrect-answer {
+                background: #ffcccc !important;
+                color: #990000 !important;
+                font-weight: bold !important;
+                border: 1.5px solid #f5c6cb !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                box-shadow: none !important;
+            }
+            
+            /* Alternating row colors for print */
+            tr.student-row:nth-of-type(even) {
+                background: #e8f4f8 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            tr.student-row:nth-of-type(even) td {
+                background: #e8f4f8 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            tr.student-row:nth-of-type(odd) {
+                background: #ffffff !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            tr.student-row:nth-of-type(odd) td {
+                background: #ffffff !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            
+            /* Override for incorrect answers */
+            tr.student-row td.incorrect-answer {
+                background: #ffcccc !important;
+                color: #990000 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            
+            /* When vertical view is active */
+            #vertical-results-container {
+                display: none;
+                width: 100%;
+                box-sizing: border-box;
+                padding: 0 1em;
+            }
+            
+            #results-container {
+                padding: 0 1em;
+            }
+            
+            body.vertical-view-active #vertical-results-container {
+                display: block;
+            }
+            
+            body.vertical-view-active #results-container {
+                display: none !important;
+            }
+            
+            .print-vertical-table-container {
+                display: none !important;
+            }
+            .school-section {
+                page-break-before: always;
+            }
+            .student-row {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            /* Hide screen-only elements when printing */
+            .screen-only {
+                display: none !important;
+            }
+            thead { display: table-header-group !important; }
+            .print-header { display: block !important; text-align: left; font-size: 1.7em; font-weight: bold; margin-bottom: 0.5em; margin-top: 0.5em; }
+        } /* This '}' closes the first @media print block */
+
+        /* Compact vertical view for print - moved outside the first @media print block */
+        @media print {
+            body.vertical-view-active {
+                size: portrait !important;
+                padding-top: 0 !important; /* Remove sticky header padding */
+            }
+            
+            @page {
+                size: portrait !important;
+                margin: 0in 0.25in 0.15in 0.25in !important; /* Reduced top margin */
+            }
+            
+            /* Hide buttons and controls */
+            button, .btn, .controls, #toggle-view-btn {
+                display: none !important;
+            }
+            
+            /* Hide the main headers in print (they're shown via print-grade-header) */
+            .vertical-view-container > h2,
+            .vertical-view-container > h3 {
+                display: none !important;
+            }
+            
+            /* Show print-only headers and force page breaks before grades */
+            .print-grade-header {
+                display: none !important;
+            }
+            @media print {
+                .print-grade-header {
+                    display: block !important;
+                    page-break-after: avoid !important;
+                    page-break-before: always !important;
+                }
+            }
+            
+            /* Show continuation headers (for 2nd, 3rd, etc. groups of 4 students) */
+            .print-continuation-header {
+                display: block !important;
+                page-break-after: avoid !important;
+                page-break-before: always !important;
+            }
+            
+            /* Don't break before the very first grade header */
+            .vertical-view-container .print-grade-header:first-of-type {
+                page-break-before: avoid !important;
+            }
+            
+            /* Create 4-column layout for student cards side-by-side (default for 2-column tests) */
+            .grade-group {
+                display: grid !important;
+                grid-template-columns: repeat(4, 1fr) !important;
+                gap: 0.4em !important;
+                min-height: auto !important;
+                page-break-inside: avoid !important;
+                page-break-after: auto !important;
+                margin-bottom: 0.3em !important;
+            }
+            
+            /* Use 3 cards per row for 3-column tests to give more horizontal space */
+            .grade-group.three-column-test {
+                 grid-template-columns: repeat(3, 1fr) !important;
+                 gap: 0.18em !important;
+            }
+            
+            /* Force page break before grade-group if it would be the 5th+ card */
+            .grade-group:not(:first-of-type) {
+                page-break-before: auto !important;
+            }
+            
+            .vertical-student-card {
+                border: 2px solid #333 !important;
+                padding: 0.6em !important;
+                margin-bottom: 0 !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                font-size: 13px !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+                display: flex !important;
+                flex-direction: column !important;
+                min-height: 730px !important;
+                height: auto !important;
+            }
+            
+            .vertical-student-header {
+                padding-bottom: 0.7em !important;
+                margin-bottom: 0.8em !important;
+                border-bottom: 2px solid #333 !important;
+                font-size: 13px !important;
+                flex-shrink: 0 !important;
+                display: flex !important;
+                flex-direction: column !important;
+            }
+            
+            .vertical-header-row {
+                display: flex !important;
+                width: 100% !important;
+                justify-content: flex-end !important;
+                gap: 0.5em !important;
+                flex-wrap: nowrap !important;
+                margin-bottom: 0 !important;
+                line-height: 1.2 !important;
+            }
+            
+            /* Student ID on left, everything else on right */
+            .vertical-header-row:first-child {
+                margin-bottom: 0.05em !important;
+            }
+            
+            .vertical-header-row:first-child .vertical-header-cell:first-child {
+                margin-right: auto !important;
+            }
+            
+            .vertical-header-row:nth-child(2) {
+                margin-bottom: 0.15em !important;
+            }
+            
+            .vertical-header-row.score-row {
+                margin-top: 0 !important;
+            }
+            
+            .vertical-header-cell {
+                font-size: 12px !important;
+                font-weight: bold !important;
+                white-space: nowrap !important;
+            }
+            
+            /* Make Student ID larger in print */
+            .vertical-header-row:first-child .vertical-header-cell:first-child {
+                font-size: 15px !important;
+            }
+            
+            .initials-line {
+                border-bottom: 2px solid #333 !important;
+                min-width: 100px !important;
+                display: inline-block !important;
+                margin-left: 0.5em !important;
+                padding-bottom: 0.1em !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            
+            .initials-row {
+                display: flex !important; /* Show for print */
+                margin-top: 0.6em !important;
+                margin-bottom: -0.5em !important;
+            }
+            
+            .score-highlight {
+                background-color: #e0e0e0 !important;
+                padding: 0.2em 0.5em !important;
+                border-radius: 3px !important;
+                font-size: 1.05em !important;
+                border: 2px solid #666 !important;
+                border-style: solid !important;
+                border-width: 2px !important;
+                border-color: #666 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                display: inline-block !important;
+            }
+            
+            .incorrect-highlight {
+                background-color: #ffcccc !important;
+                padding: 0.2em 0.4em !important;
+                border-radius: 3px !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            
+            .vertical-answers-grid {
+                gap: 0.1em !important;
+                flex: 1 !important;
+                display: grid !important;
+                /* Don't force column count - let it be set by inline style */
+            }
+            
+            .vertical-column {
+                padding: 0.08em !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: flex-start !important;
+            }
+            
+            .vertical-answer-row {
+                padding: 0.25em 0.35em !important;
+                font-size: 11px !important;
+                border-bottom: 1px solid #ddd !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: flex-start !important;
+                gap: 0.1em !important;
+                margin-bottom: 0.15em !important;
+                line-height: 1.3 !important;
+            }
+            
+            .vertical-question-num {
+                min-width: 24px !important;
+                font-size: 11px !important;
+                margin-right: 0 !important;
+                font-weight: bold !important;
+                line-height: 1.3 !important;
+            }
+            
+            .vertical-answer {
+                min-width: 24px !important;
+                font-size: 13px !important;
+                padding: 0.18em 0.32em !important;
+                font-weight: normal !important;
+            }
+            
+            .vertical-answer.incorrect {
+                background: #e0e0e0 !important;
+                font-weight: bold !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            
+            .vertical-answer.correct {
+                font-weight: normal !important;
+            }
+            
+            /* Dynamic sizing based on questions per column */
+            /* Small: 15 or fewer questions per column - larger spacing */
+
+                /* Reduce column gap inside each card for 3-column tests in print */
+                .grade-group.three-column-test .vertical-answers-grid {
+                    column-gap: 0.08em !important;
+                    gap: 0.08em !important;
+                }
+            .vertical-student-card.size-small .vertical-column {
+                padding: 0.12em !important;
+            }
+            .vertical-student-card.size-small .vertical-answer-row {
+                padding: 0.35em 0.45em !important;
+                font-size: 12px !important;
+                margin-bottom: 0.25em !important;
+                line-height: 2 !important;
+            }
+            .vertical-student-card.size-small .vertical-question-num {
+                font-size: 12px !important;
+                line-height: 2 !important;
+            }
+            .vertical-student-card.size-small .vertical-answer {
+                font-size: 14px !important;
+                padding: 0.22em 0.38em !important;
+            }
+            
+            /* Medium: 16-20 questions per column - medium spacing */
+            .vertical-student-card.size-medium .vertical-column {
+                padding: 0.1em !important;
+            }
+            .vertical-student-card.size-medium .vertical-answer-row {
+                padding: 0.3em 0.4em !important;
+                font-size: 11.5px !important;
+                margin-bottom: 0.2em !important;
+                line-height: 1.35 !important;
+            }
+            .vertical-student-card.size-medium .vertical-question-num {
+                font-size: 11.5px !important;
+                line-height: 1.35 !important;
+            }
+            .vertical-student-card.size-medium .vertical-answer {
+                font-size: 13.5px !important;
+                padding: 0.2em 0.35em !important;
+            }
+            
+            /* Large: 21+ questions per column - maximize vertical space for print */
+            /* Print: Use only dynamic sizing logic for vertical cards */
+            @media print {
+                .vertical-student-card.size-small {
+                    padding: 0.5em 0.3em 0.5em 0.2em !important;
+                    font-size: 1.2em !important;
+                    margin-bottom: 0.4em !important;
+                    width: 46vw !important;
+                    max-width: 48% !important;
+                    box-sizing: border-box !important;
+                }
+                .vertical-student-card.size-medium {
+                    padding: 0.4em 0.2em 0.4em 0.1em !important;
+                    font-size: 1.15em !important;
+                    margin-bottom: 0.4em !important;
+                    width: 32vw !important;
+                    max-width: 33% !important;
+                    box-sizing: border-box !important;
+                }
+                .vertical-student-card.size-large {
+                    padding: 0.3em 0.08em 0.3em 0.04em !important;
+                    font-size: 1.13em !important;
+                    margin-bottom: 0.3em !important;
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    box-sizing: border-box !important;
+                }
+                .vertical-header-row {
+                    display: flex !important;
+                    width: 100% !important;
+                    justify-content: space-between !important;
+                    gap: 0.3em !important;
+                    flex-wrap: nowrap !important;
+                    margin-bottom: 0.2em !important;
+                    line-height: 1.2 !important;
+                }
+                .vertical-header-cell.id-label-cell {
+                    font-size: 1.18em !important;
+                    font-weight: bold !important;
+                    text-align: left !important;
+                }
+                .vertical-header-cell.id-value-cell {
+                    font-size: 1.85em !important;
+                    font-weight: bold !important;
+                    text-align: left !important;
+                }
+                .vertical-answers-grid {
+                    gap: 0.06em !important;
+                    flex: 1 !important;
+                    display: grid !important;
+                }
+                    /* FORCE: Reduce column gap for 3-column cards (Maps/Science) in print */
+                    .grade-group.three-column-test .vertical-answers-grid {
+                        column-gap: 0.01em !important;
+                        gap: 0.01em !important;
+                    }
+                .vertical-column {
+                    padding: 0.04em 0 !important;
+                    margin-right: 0 !important;
+                    display: flex !important;
+                    flex-direction: column !important;
+                    justify-content: flex-start !important;
+                }
+                .vertical-answer-row {
+                    padding: 0.18em 0.22em !important;
+                    font-size: 1em !important;
+                    border-bottom: 1px solid #ddd !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: flex-start !important;
+                    gap: 0.08em !important;
+                    margin-bottom: 0.08em !important;
+                    line-height: 1.2 !important;
+                }
+                .vertical-question-num {
+                    min-width: 22px !important;
+                    font-size: 1em !important;
+                    margin-right: 0 !important;
+                    font-weight: bold !important;
+                    line-height: 1.2 !important;
+                }
+                .vertical-answer {
+                    min-width: 22px !important;
+                    font-size: 1.08em !important;
+                    padding: 0.13em 0.18em !important;
+                    font-weight: normal !important;
+                }
+            }
+            
+            .vertical-view-container {
+                padding: 0.1em !important;
+                margin-bottom: 0.2em !important;
+                box-shadow: none !important;
+                page-break-before: always !important; /* Each school on new page */
+            }
+            
+            .vertical-view-container:first-child {
+                page-break-before: avoid !important; /* Don't break before first school */
+            }
+            
+            .vertical-view-container h2 {
+                font-size: 16px !important;
+                margin: 0 0 0.1em 0 !important;
+                page-break-after: avoid !important;
+                page-break-inside: avoid !important;
+                font-weight: bold !important;
+            }
+            
+            .vertical-view-container h3 {
+                font-size: 14px !important;
+                margin: 0 0 0.3em 0 !important;
+                page-break-after: avoid !important;
+                page-break-inside: avoid !important;
+                font-weight: bold !important;
+            }
+            
+            .vertical-view-container h4 {
+                font-size: 14px !important;
+                margin-top: 0 !important;
+                margin-bottom: 0.3em !important;
+                page-break-after: avoid !important;
+                grid-column: 1 / -1 !important; /* Span full width for grade headers */
+                font-weight: bold !important;
+            }
+                /* FINAL OVERRIDE: Remove all column gap for 3-column cards in print */
+                    .vertical-view-container .grade-group.three-column-test .vertical-answers-grid {
+                        column-gap: 0 !important;
+                        grid-column-gap: 0 !important;
+                        gap: 0 !important;
+                    }
+                    /* DEBUG: Add background to columns to confirm selector is working (remove after test) */
+                    .vertical-view-container .grade-group.three-column-test .vertical-column {
+                        background: #ffe4e1 !important;
+                    }
+        } /* This '}' closes the second @media print block */
+
+        .print-vertical-table-container {
+            display: none;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8f9fa;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            padding-top: 54px; /* Space for sticky header - just controls, no summary-stats padding */
+            font-size: 12px;
+            box-sizing: border-box;
+            overflow-x: hidden;
+        }
+        
+        /* Sticky header for controls and summary */
+        .controls {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #fff;
+            padding: 0.8em 1em;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            z-index: 1000;
+            display: flex;
+            gap: 0.5em;
+            flex-wrap: wrap;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .summary-stats {
+            position: fixed;
+            top: 52px; /* Below controls - adjusted to fit tighter */
+            left: 0;
+            right: 0;
+            background: #f8f9fa;
+            padding: 0;
+            margin: 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            z-index: 999;
+            border-bottom: 1px solid #dee2e6;
+            min-height: 0;
+        }
+        
+        .summary-stats:empty {
+            display: none;
+        }
+        
+        .btn {
+            padding: 0.5em 1em;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.95em;
+            transition: opacity 0.2s;
+        }
+        
+        .btn:hover {
+            opacity: 0.9;
+        }
+        
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+        
+        h1 { color: #495057; margin-bottom: 0.5em; margin-left: 1em; margin-right: 1em; }
+        h2 { 
+            color: #6c757d; 
+            border-bottom: 2px solid #dee2e6; 
+            padding-bottom: 0.3em; 
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
+            margin-left: 1em;
+            margin-right: 1em;
+        }
+        .grade-section {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 2em;
+            margin-left: 1em;
+            margin-right: 1em;
+            overflow: visible;
+            padding: 1em;
+            box-sizing: border-box;
+        }
+        .table-container {
+            overflow-x: auto;
+            overflow-y: visible;
+            max-width: 100%;
+            border: 1px solid #dee2e6;
+            position: relative;
+        }
+        .table-container table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .table-container th, .table-container td {
+            border: 1px solid #e9ecef; /* General grid lines */
+        }
+        .table-container tbody tr:hover {
+            background-color: #e2f0fb; /* Row highlighting on hover */
+        }
+        .fixed-col-1 {
+            position: sticky;
+            left: 0;
+        }
+        .grade-section, .school-section {
+            width: 100%;
+            overflow: visible;
+        }
+        
+        /* Vertical Comparison View Styles */
+        .vertical-view-container {
+            background: #fff;
+            padding: 1em 1em 2em 1em;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 3em;
+            margin-top: 3em;
+            clear: both;
+            width: 100%;
+            page-break-before: always;
+            page-break-inside: avoid;
+            break-before: page;
+            break-inside: avoid;
+            display: block;
+            border-top: 3px solid #e0e0e0;
+        }
+        .vertical-view-container:first-child {
+            border-top: none;
+            margin-top: 0;
+        }
+        .grade-group {
+            width: 100%;
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
+            clear: both;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.8em;
+            margin-bottom: 1.5em;
+            margin-top: 1.5em;
+            box-sizing: border-box;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            align-items: start;
+        }
+        .grade-group.three-column-test {
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 0.8em !important;
+        }
+        .vertical-student-card {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            justify-content: flex-start;
+            min-width: 0;
+            max-width: 340px;
+            width: 100%;
+            box-sizing: border-box;
+            margin: 0 auto;
+            padding: 0.5em 0.5em 1em 0.5em;
+        }
+        .vertical-student-card {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        @media print {
+                .vertical-view-container {
+                    page-break-before: always !important;
+                    break-before: page !important;
+                    margin-top: 3em !important;
+                }
+                .grade-group {
+                    page-break-inside: avoid !important;
+                    break-inside: avoid !important;
+                }
+                .vertical-student-card {
+                    page-break-inside: avoid !important;
+                    break-inside: avoid !important;
+                }
+            }
+        @media print {
+            .vertical-view-container {
+                page-break-before: always !important;
+                break-before: page !important;
+                margin-top: 3em !important;
+            }
+            .grade-group {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+        }
+        .grade-group {
+            width: 100%;
+            clear: both;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.8em;
+            margin-bottom: 1.5em;
+            align-items: start;
+            box-sizing: border-box;
+        }
+        /* Removed duplicate and malformed @media print block */
+        .vertical-view-container h2 {
+            font-size: 2em;
+            color: #007bff;
+            margin-top: 0;
+            margin-bottom: 0.3em;
+        }
+        .vertical-view-container h3 {
+            font-size: 1.5em;
+            color: #495057;
+            margin-top: 0;
+            margin-bottom: 0.5em;
+        }
+        .vertical-view-container h4 {
+            font-size: 1.3em;
+            color: #6c757d;
+            margin-top: 1.5em;
+            margin-bottom: 1em;
+            border-bottom: 2px solid #dee2e6;
+            padding-bottom: 0.3em;
+        }
+        .grade-group {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.8em;
+            margin-bottom: 1.5em;
+            align-items: start;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .vertical-student-card {
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 0.8em;
+            background: #fff;
+            page-break-inside: avoid;
+            box-sizing: border-box;
+            min-width: 0;
+        }
+        .vertical-student-card .vertical-answers-grid {
+            border: 1px solid #e9ecef; /* Grid lines for the answer grid */
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .vertical-student-card .vertical-answer-row {
+            border-bottom: 1px solid #e9ecef; /* Horizontal grid lines */
+        }
+        .vertical-student-card .vertical-answer-row:last-child {
+            border-bottom: none; /* No border on the last row */
+        }
+        .vertical-student-card .vertical-column {
+            border-right: 1px solid #e9ecef; /* Vertical grid lines between columns */
+        }
+        .vertical-student-card .vertical-column:last-child {
+            border-right: none; /* No border on the last column */
+        }
+        .vertical-student-card .vertical-answer-row:hover {
+            background-color: #e2f0fb; /* Row highlighting on hover */
+        }
+        .vertical-student-header {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            padding-bottom: 1em;
+            border-bottom: 2px solid #007bff;
+            margin-bottom: 1em;
+        }
+        .vertical-header-row {
+            display: flex;
+            width: 100%;
+            justify-content: space-between;
+            gap: 0.5em;
+            flex-wrap: nowrap;
+            margin-bottom: 0.4em;
+        }
+        .vertical-header-row.score-row {
+            margin-top: 0.5em;
+        }
+        .vertical-header-cell {
+            font-size: 1.1em;
+            font-weight: bold;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .vertical-header-cell:first-child {
+            text-align: left;
+            flex: 1;
+            min-width: 0;
+            font-size: 1.2em;
+        }
+        .vertical-header-cell:last-child {
+            text-align: right;
+            flex-shrink: 0;
+        }
+        /* Smaller font for score to fit better */
+        .score-highlight {
+            font-size: 0.95em;
+        }
+        /* Student ID label smaller, value larger */
+        .id-label {
+            font-size: 0.85em;
+        }
+        .id-value {
+            font-size: 1.3em;
+            font-weight: bold;
+        }
+        .initials-line {
+            display: none; /* Hidden on screen, shown only for print */
+        }
+        .initials-row {
+            display: none; /* Hidden on screen, shown only for print */
+        }
+        .score-highlight {
+            background-color: #e3f2fd;
+            padding: 0.3em 0.6em;
+            border-radius: 4px;
+            font-size: 1.1em;
+            border: 2px solid #2196f3;
+            border-style: solid;
+            border-width: 2px;
+            border-color: #2196f3;
+            display: inline-block;
+        }
+        .incorrect-highlight {
+            background-color: #ffcccc;
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+        }
+        .vertical-answers-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+        @media print {
+            .vertical-answers-grid.three-col-maps,
+            .vertical-answers-grid.three-col-science {
+                grid-template-columns: repeat(3, 1fr) !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                min-width: 0 !important;
+                box-sizing: border-box !important;
+            }
+            /* Match card width and sizing for Science and Maps 3-column layouts */
+            .grade-group.three-column-test .vertical-student-card {
+                width: 100% !important;
+                max-width: 100% !important;
+                min-width: 0 !important;
+                box-sizing: border-box !important;
+            }
+        }
+        .vertical-column {
+            display: flex;
+            flex-direction: column;
+        }
+        .vertical-answer-row {
+            display: flex;
+            justify-content: flex-start;
+            padding: 0.3em 0.3em;
+            font-size: 1.05em;
+            gap: 0.2em;
+        }
+        .vertical-answer-row:nth-child(even) {
+            background: #f8f9fa;
+        }
+        .vertical-question-num {
+            font-weight: bold;
+            color: #495057;
+            min-width: 24px;
+            flex-shrink: 0;
+        }
+        .vertical-answer {
+            min-width: 28px;
+            text-align: center;
+            padding: 0.2em 0.4em;
+            border-radius: 4px;
+        }
+        .vertical-answer.incorrect {
+            background: #ffcccc;
+            color: #990000;
+        }
+        .vertical-answer.correct {
+            color: #28a745;
+        }
+        /* --- Horizontal Table Scrollbar and Sticky Columns Fix --- */
+        .scroll-table-container {
+            width: 100%;
+            max-width: 100vw;
+            overflow-x: auto;
+            overflow-y: visible;
+            border: 1px solid #b0b0b0;
+            background: #fff;
+        }
+        .scroll-table {
+            min-width: 1200px;
+            width: max-content;
+            border-collapse: separate;
+            border-spacing: 0;
+            background: #fff;
+            border: 1px solid #b0b0b0;
+        }
+        .scroll-table th,
+        .scroll-table td {
+            border: 1px solid #b0b0b0;
+            padding: 0.3em 0.2em;
+            background: #fff;
+            text-align: center;
+            font-size: 1em;
+        }
+        .scroll-table th.sticky,
+        .scroll-table td.sticky {
+            position: sticky;
+            left: 0;
+            z-index: 4;
+            background: #fff;
+        }
+        /* Sticky for first 4 columns (Student ID, Score, Correct, Incorrect) */
+        .scroll-table th.student-id,
+        .scroll-table td.student-id {
+            position: sticky;
+            left: 0;
+            z-index: 10;
+            background: #fff;
+        }
+        .scroll-table th.score-cell,
+        .scroll-table td.score-cell {
+            position: sticky;
+            left: 140px;
+            z-index: 10;
+            background: #fff;
+        }
+        .scroll-table th.correct-cell,
+        .scroll-table td.correct-cell {
+            position: sticky;
+            left: 220px;
+            z-index: 10;
+            background: #fff;
+        }
+        .scroll-table th.incorrect-cell,
+        .scroll-table td.incorrect-cell {
+            position: sticky;
+            left: 320px;
+            z-index: 10;
+            background: #fff;
+        }
+        /* Remove z-index from Q columns so sticky columns are always on top */
+        .scroll-table th.answer-cell:not(.student-id):not(.score-cell):not(.correct-cell):not(.incorrect-cell),
+        .scroll-table td.answer-cell:not(.student-id):not(.score-cell):not(.correct-cell):not(.incorrect-cell) {
+            z-index: 1 !important;
+        }
+        /* Answer Key row: center text in first 4 columns */
+        .scroll-table tr.answer-key-row td.student-id,
+        .scroll-table tr.answer-key-row td.score-cell,
+        .scroll-table tr.answer-key-row td.correct-cell,
+        .scroll-table tr.answer-key-row td.incorrect-cell {
+            text-align: center;
+            vertical-align: middle;
+            font-weight: bold;
+        }
+        /* Ensure answer key row is above data rows */
+        .scroll-table tr.answer-key-row td {
+            z-index: 3;
+            position: relative;
+        }
+        .scroll-table th.answer-cell,
+        .scroll-table td.answer-cell {
+            min-width: 36px;
+            max-width: 36px;
+            width: 36px;
+        }
+        .scroll-table th.student-id,
+        .scroll-table td.student-id {
+            min-width: 140px;
+            max-width: 180px;
+            width: 140px;
+        }
+        .scroll-table th.score-cell,
+        .scroll-table td.score-cell {
+            min-width: 80px;
+            max-width: 100px;
+            width: 80px;
+        }
+        .scroll-table th.correct-cell,
+        .scroll-table td.correct-cell {
+            min-width: 100px;
+            max-width: 120px;
+            width: 100px;
+        }
+        .scroll-table th.incorrect-cell,
+        .scroll-table td.incorrect-cell {
+            min-width: 120px;
+            max-width: 140px;
+            width: 120px;
+        }
+        /* Red highlight for incorrect answers */
+        .scroll-table td.incorrect-answer {
+            background: #ffeaea !important;
+            color: #c00;
+            font-weight: bold;
+        }
+        /* Always show horizontal scrollbar */
+        .scroll-table-container {
+            scrollbar-color: #b0b0b0 #f8f9fa;
+            scrollbar-width: thin;
+        }
+        .scroll-table-container::-webkit-scrollbar {
+            height: 12px;
+            background: #f8f9fa;
+        }
+        .scroll-table-container::-webkit-scrollbar-thumb {
+            background: #b0b0b0;
+            border-radius: 6px;
+        }
+    </style>
+    </head>
+    <body>
+    <!-- Screen-only header -->
+    <h1 id="report-title" class="screen-only" style="text-align:center; margin-top: 0.7em; margin-bottom: 0.7em; font-size:2.2em; color:#007bff; letter-spacing:0.01em;">Teacher Verification Report</h1>
+    <!-- To use only one indicator, set display: none on the other in the #scanning-indicator div above -->
+
+    <div class="controls">
+        <button class="btn btn-info" id="toggle-view-btn" style="background: #17a2b8; color: #fff;">Switch to Vertical View</button>
+        <button class="btn btn-primary" onclick="window.print()">Print Report</button>
+        <button class="btn btn-success" onclick="exportToCSV()">Export CSV</button>
+        <button class="btn btn-success" onclick="exportToExcel()">Export Excel</button>
+        <button class="btn" onclick="clearAllResults()" style="background: #dc3545; color: #fff;">Clear All Results</button>
+    </div>
+
+    <div class="summary-stats" id="summary-stats">
+        <!-- Summary statistics will be populated here -->
+    </div>
+
+    <div id="results-container">
+        <!-- Horizontal table view (default) -->
+    </div>
+    
+    <div id="vertical-results-container" style="display: none;">
+        <!-- Vertical comparison view (like official answer key) -->
+    </div>
+
+    <script>
+                // Attach toggleView handler after DOM is loaded
+                document.addEventListener('DOMContentLoaded', function() {
+                    var toggleBtn = document.getElementById('toggle-view-btn');
+                    if (toggleBtn) toggleBtn.addEventListener('click', toggleView);
+                });
+                // Global variables to store results data
+                let allResults = [];
+
+                // Short test name mapping for CSV export
+                const shortTestNames = {
+                    "Art Part B 6th": "Art 6",
+                    "Art Part B 7th": "Art 7",
+                    "Art Part B 8th": "Art 8",
+                    "Chess Puzzle 6th": "Chess 6",
+                    "Chess Puzzle 7th": "Chess 7",
+                    "Chess Puzzle 8th": "Chess 8",
+                    "Dictionary Skills 6th": "Dictionary 6",
+                    "Dictionary Skills 7th": "Dictionary 7",
+                    "Dictionary Skills 8th": "Dictionary 8",
+                    "Listening 6th": "Listening 6",
+                    "Listening 7th": "Listening 7",
+                    "Listening 8th": "Listening 8",
+                    "Maps, Graphs, & Charts 6th": "Maps 6",
+                    "Maps, Graphs, & Charts 7th": "Maps 7",
+                    "Maps, Graphs, & Charts 8th": "Maps 8",
+                    "Mathematics 6th": "Math 6",
+                    "Mathematics 7th": "Math 7",
+                    "Mathematics 8th": "Math 8",
+                    "Science 6th": "Science 6",
+                    "Science 7th": "Science 7",
+                    "Science 8th": "Science 8",
+                    "Social Studies 6th": "Social Studies 6",
+                    "Social Studies 7th": "Social Studies 7",
+                    "Social Studies 8th": "Social Studies 8"
+                };
+        
+        // Test layout configurations for vertical view
+        const testLayouts = {
+            // 2-column layouts
+            'Social Studies 6th': { columns: 2, ranges: [[1, 20], [21, 40]] },
+            'Social Studies 7th': { columns: 2, ranges: [[1, 20], [21, 40]] },
+            'Social Studies 8th': { columns: 2, ranges: [[1, 20], [21, 40]] },
+            'Dictionary Skills 6th': { columns: 2, ranges: [[1, 20], [21, 40]] },
+            'Dictionary Skills 7th': { columns: 2, ranges: [[1, 20], [21, 40]] },
+            'Dictionary Skills 8th': { columns: 2, ranges: [[1, 20], [21, 40]] },
+            'Listening 6th': { columns: 2, ranges: [[1, 13], [14, 25]] },
+            'Listening 7th': { columns: 2, ranges: [[1, 13], [14, 25]] },
+            'Listening 8th': { columns: 2, ranges: [[1, 13], [14, 25]] },
+            'Mathematics 6th': { columns: 2, ranges: [[1, 25], [26, 50]] },
+            'Mathematics 7th': { columns: 2, ranges: [[1, 25], [26, 50]] },
+            'Mathematics 8th': { columns: 2, ranges: [[1, 25], [26, 50]] },
+            'Art Part B 6th': { columns: 2, ranges: [[1, 15], [16, 30]] },
+            'Art Part B 7th': { columns: 2, ranges: [[1, 15], [16, 30]] },
+            'Art Part B 8th': { columns: 2, ranges: [[1, 15], [16, 30]] },
+            'Chess Puzzle 6th': { 
+                sections: [
+                    { title: 'Test', columns: 2, ranges: [[1, 10], [11, 20]] },
+                    { title: 'Tiebreaker', columns: 2, ranges: [[21, 24], [25, 28]] }
+                ]
+            },
+            'Chess Puzzle 7th': { 
+                sections: [
+                    { title: 'Test', columns: 2, ranges: [[1, 10], [11, 20]] },
+                    { title: 'Tiebreaker', columns: 2, ranges: [[21, 24], [25, 28]] }
+                ]
+            },
+            'Chess Puzzle 8th': { 
+                sections: [
+                    { title: 'Test', columns: 2, ranges: [[1, 10], [11, 20]] },
+                    { title: 'Tiebreaker', columns: 2, ranges: [[21, 24], [25, 28]] }
+                ]
+            },
+            
+            // 3-column layouts
+            'Science 6th': { columns: 3, ranges: [[1, 17], [18, 34], [35, 50]] },
+            'Science 7th': { columns: 3, ranges: [[1, 17], [18, 34], [35, 50]] },
+            'Science 8th': { columns: 3, ranges: [[1, 17], [18, 34], [35, 50]] },
+            'Maps, Graphs, & Charts 6th': { columns: 3, ranges: [[1, 25], [26, 50], [51, 75]] },
+            'Maps, Graphs, & Charts 7th': { columns: 3, ranges: [[1, 25], [26, 50], [51, 75]] },
+            'Maps, Graphs, & Charts 8th': { columns: 3, ranges: [[1, 25], [26, 50], [51, 75]] }
+        };
+        
+        // Base scoring configurations (without grade suffixes)
+        const baseScoringConfigs = {
+            'Art Part B': { correctPoints: 2, incorrectPoints: 0, description: '+2 per correct, no penalty' },
+            'Chess Puzzle': { correctPoints: 1, incorrectPoints: 0, tiebreaker: 0.01, description: '+1 per correct, tiebreaker +0.01' },
+            'Dictionary Skills': { correctPoints: 3, incorrectPoints: -2, description: '+3 per correct, -2 per incorrect' },
+            'Listening': { correctPoints: 3, incorrectPoints: -2, description: '+3 per correct, -2 per incorrect' },
+            'Maps, Graphs, & Charts': { correctPoints: 3, incorrectPoints: -2, description: '+3 per correct, -2 per incorrect' },
+            'Mathematics': { correctPoints: 5, incorrectPoints: -2, description: '+5 per correct, -2 per incorrect' },
+            'Science': { correctPoints: 5, incorrectPoints: -2, description: '+5 per correct, -2 per incorrect' },
+            'Social Studies': { correctPoints: 3, incorrectPoints: -2, description: '+3 per correct, -2 per incorrect' },
+            'Default': { correctPoints: 1, incorrectPoints: 0, description: '+1 per correct, no penalty' }
+        };
+        
+        // Smart function to get scoring config by stripping grade suffixes
+        function getScoringConfig(testName) {
+            // Try exact match first
+            if (baseScoringConfigs[testName]) {
+                return baseScoringConfigs[testName];
+            }
+            
+            // Strip common grade patterns from test name
+            let baseTestName = testName
+                // Remove patterns like " - 6th Grade", " - 7th Grade", " - 8th Grade"
+                .replace(/ - \d+(st|nd|rd|th) Grade$/i, '')
+                // Remove patterns like " - 7th & 8th Grades", " - 6th & 7th Grades"
+                .replace(/ - \d+(st|nd|rd|th) & \d+(st|nd|rd|th) Grades$/i, '')
+                // Remove patterns like " - Grades 6-8"
+                .replace(/ - Grades \d+-\d+$/i, '')
+                // Remove patterns like " 6th", " 7th", " 8th"
+                .replace(/ \d+(st|nd|rd|th)$/i, '')
+                .trim();
+            
+            // Try base name match
+            if (baseScoringConfigs[baseTestName]) {
+                return baseScoringConfigs[baseTestName];
+            }
+            
+            // Fall back to default
+            return baseScoringConfigs['Default'];
+        }
+        
+        // Deprecated: Keep old scoringConfigs for backward compatibility, but redirect to getScoringConfig
+        // This will be removed in future versions
+        let scoringConfigs = new Proxy({}, {
+            get: function(target, prop) {
+                return getScoringConfig(prop);
+            }
+        });
+
+        // Safe split helper
+        function safeSplit(str, sep = ',') {
+            if (!str || typeof str !== 'string') return [];
+            return str.split(sep);
+        }
+
+        // Initialize the page (only use window.onload)
+
+        // Load results from localStorage or API
+        function loadResults() {
+            // Try to get results from localStorage first
+            const storedResults = localStorage.getItem('teacherVerificationResults');
+            if (storedResults) {
+                allResults = JSON.parse(storedResults);
+                displayResults();
+            } else {
+                // If no stored results, show message to scan sheets first
+                document.getElementById('results-container').innerHTML = 
+                    '<div style="text-align: center; padding: 2em; color: #6c757d;">' +
+                    '<h3>No results found</h3>' +
+                    '<p>Please scan bubble sheets first to generate verification results.</p>' +
+                    '<a href="/simple_scan" style="color: #007bff;">Go to Scanner</a>' +
+                    '</div>';
+            }
+        }
+
+        // Display results organized by school, then by test
+        function displayResults() {
+            if (!allResults || allResults.length === 0) {
+                loadResults();
+                return;
+            }
+
+            updateSummaryStats();
+
+            // Group results by school code first, then by test
+            const groupedResults = groupResultsBySchoolAndTest();
+            let html = '';
+            let isFirstTable = true;
+
+            Object.keys(groupedResults).forEach((schoolCode, schoolIndex) => {
+                const schoolResults = groupedResults[schoolCode];
+                // Map school code to name for display
+                let schoolName = schoolMap && schoolMap[schoolCode] ? schoolMap[schoolCode] : `School ${schoolCode}`;
+                html += `<div class="school-section">`;
+                Object.keys(schoolResults).forEach(testName => {
+                    const testResults = schoolResults[testName];
+                    const displayTestName = testName
+                        .replace(/ - \d+(st|nd|rd|th) Grade$/i, '')
+                        .replace(/ - \d+(st|nd|rd|th) & \d+(st|nd|rd|th) Grades$/i, '')
+                        .replace(/ - Grades \d+-\d+$/i, '')
+                        .replace(/ \d+(st|nd|rd|th)$/i, '')
+                        .trim();
+                    // Group by grade
+                    const gradeGroups = {};
+                    testResults.forEach(r => {
+                        const grade = r.parsedInfo.grade;
+                        if (!gradeGroups[grade]) gradeGroups[grade] = [];
+                        gradeGroups[grade].push(r);
+                    });
+                    Object.keys(gradeGroups).sort((a, b) => a - b).forEach(grade => {
+                            const gradeLabel = grade === '6' ? '6th Grade' : (grade === '7' ? '7th Grade' : (grade === '8' ? '8th Grade' : `Grade ${grade}`));
+                        window.currentTestLabel = `${displayTestName} - ${gradeLabel}`;
+                        html += `<div class="grade-section table-page-break">`;
+                        html += generateTestTable(gradeGroups[grade], testName, isFirstTable, schoolName, `${displayTestName} - ${gradeLabel}`);
+                        html += `</div>`;
+                        isFirstTable = false;
+                    });
+                });
+                html += `</div>`;
+            });
+
+            document.getElementById('results-container').innerHTML = html;
+        }
+
+
+        // School mapping (dynamic)
+        let schoolMap = {};
+        function loadSchoolMapAndDisplayResults() {
+            fetch('/api/school_list').then(r => r.json()).then(data => {
+                schoolMap = data;
+                displayResults();
+            });
+        }
+
+        // Call this instead of displayResults() on page load
+        window.onload = function() {
+            loadSchoolMapAndDisplayResults();
+        };
+
+        // Parse student ID to extract grade and school
+        function parseStudentId(studentId) {
+            if (studentId === null || studentId === undefined) {
+                return {
+                    grade: null,
+                    schoolCode: null,
+                    schoolName: 'Unknown School',
+                    studentNumber: '',
+                    fullStudentId: studentId
+                };
+            }
+            const idStr = studentId.toString().padStart(4, '0');
+            const grade = parseInt(idStr[0]);
+            const schoolCode = parseInt(idStr[1]);
+            const studentNumber = idStr.slice(2);
+            const schoolCodeStr = String(schoolCode);
+            return {
+                grade: grade,
+                schoolCode: schoolCode,
+                schoolName: schoolMap[schoolCodeStr] || `School ${schoolCodeStr}`,
+                studentNumber: studentNumber,
+                fullStudentId: studentId
+            };
+        }
+
+        // Group results by test name and grade level
+        function groupResultsByTestAndGrade() {
+            const grouped = {};
+            
+            allResults.forEach(result => {
+                // Defensive: skip results with missing studentId or testName
+                if (!result || result.studentId === null || result.studentId === undefined || !result.testName) {
+                    // Optionally log or warn here
+                    return;
+                }
+                const testName = result.testName || 'Unknown Test';
+                if (!grouped[testName]) {
+                    grouped[testName] = [];
+                }
+                // Parse student ID and add school/grade info
+                const studentInfo = parseStudentId(result.studentId);
+                result.parsedInfo = studentInfo;
+                result.grade = studentInfo.grade; // Ensure grade is set correctly
+                grouped[testName].push(result);
+            });
+
+            // Sort students within each test: first by school, then by grade, then by student number
+            Object.keys(grouped).forEach(testName => {
+                grouped[testName].sort((a, b) => {
+                    // First sort by school code
+                    if (a.parsedInfo.schoolCode !== b.parsedInfo.schoolCode) {
+                        return a.parsedInfo.schoolCode - b.parsedInfo.schoolCode;
+                    }
+                    // Then by grade
+                    if (a.parsedInfo.grade !== b.parsedInfo.grade) {
+                        return a.parsedInfo.grade - b.parsedInfo.grade;
+                    }
+                    // Finally by student number
+                    return a.parsedInfo.studentNumber.localeCompare(b.parsedInfo.studentNumber);
+                });
+            });
+
+            return grouped;
+        }
+
+        // Group results by school and test
+        function groupResultsBySchoolAndTest(resultsArray) {
+            const grouped = {};
+            const arr = resultsArray || allResults;
+            arr.forEach(result => {
+                if (!result || result.studentId === null || result.studentId === undefined || !result.testName) {
+                    return;
+                }
+                const studentInfo = parseStudentId(result.studentId);
+                result.parsedInfo = studentInfo;
+                result.grade = studentInfo.grade;
+                const schoolCode = studentInfo.schoolCode !== null && studentInfo.schoolCode !== undefined ? String(studentInfo.schoolCode) : 'Unknown';
+                if (!grouped[schoolCode]) grouped[schoolCode] = {};
+                if (!grouped[schoolCode][result.testName]) grouped[schoolCode][result.testName] = [];
+                grouped[schoolCode][result.testName].push(result);
+            });
+            return grouped;
+        }
+
+        // Generate table for a specific test (split into multiple tables for better printing)
+        function generateTestTable(results, testName, isFirstTable, schoolName, testLabel) {
+            if (results.length === 0) return '';
+
+            const answerKey = results[0].answerKey || {};
+            // Get max question number from both answers and answer key
+            const maxFromAnswers = Math.max(0, ...results.map(r => {
+                const keys = Object.keys(r.answers || {});
+                return keys.length > 0 ? Math.max(...keys.map(k => parseInt(k))) : 0;
+            }));
+            const maxFromKey = Object.keys(answerKey).length > 0 ? Math.max(...Object.keys(answerKey).map(k => parseInt(k))) : 0;
+            const maxQuestions = Math.max(maxFromAnswers, maxFromKey);
+
+            let html = '';
+
+            // Deduplicate students by studentId for this test
+            const seen = new Set();
+            const uniqueResults = results.filter(r => {
+                if (seen.has(r.studentId)) return false;
+                seen.add(r.studentId);
+                return true;
+            });
+
+            // Render separate tables for each 20-question section
+            const QUESTIONS_PER_ROW = 20;
+            const numQuestionRows = Math.ceil(maxQuestions / QUESTIONS_PER_ROW);
+
+            // Wrap all question sections for this school/grade in a single page-break container
+            html += '<div class="school-grade-section">';
+
+            // Loop through each 20-question section and create a separate table
+            for (let row = 0; row < numQuestionRows; row++) {
+                const startQ = row * QUESTIONS_PER_ROW + 1;
+                const endQ = Math.min((row + 1) * QUESTIONS_PER_ROW, maxQuestions);
+                
+                // Check if this section contains tiebreaker questions for Chess Puzzle
+                const isChessPuzzle = testName.includes('Chess Puzzle');
+                const isTiebreakerSection = isChessPuzzle && startQ >= 21;
+
+                html += '<div class="question-section">';
+                if (row === 0) {
+                    // Print-only header
+                    html += '<div class="print-only" style="margin-bottom: 1em;">';
+                    html += `<h2 style="color:#007bff; margin: 0.5em 0; padding: 0;">${schoolName}</h2>`;
+                    html += `<h3 style="color:#007bff; margin: 0.5em 0; padding: 0;">${testLabel}</h3>`;
+                    html += '</div>';
+                    // Web-view header
+                    html += '<div class="screen-only" style="margin-bottom: 1em;">';
+                    html += `<h2 style="color:#007bff; margin: 0.5em 0; padding: 0;">${schoolName}</h2>`;
+                    html += `<h3 style="color:#007bff; margin: 0.5em 0; padding: 0;">${testLabel}</h3>`;
+                    html += '</div>';
+                }
+                
+                // Add tiebreaker section header if applicable
+                if (isTiebreakerSection) {
+                    html += '<h4 style="color:#495057; margin: 1em 0 0.5em 0; font-weight: bold;">Tiebreaker (0.01 points each)</h4>';
+                }
+                html += '<div class="scroll-table-container" style="overflow-x: auto; width: 100%;">';
+                html += '<table class="scroll-table" style="table-layout: fixed; min-width: 900px;">';
+                html += '<colgroup>';
+                html += '<col class="student-id" style="width:140px;min-width:140px;max-width:180px;">';
+                html += '<col class="score-cell" style="width:80px;min-width:80px;max-width:100px;">';
+                html += '<col class="correct-cell" style="width:100px;min-width:100px;max-width:120px;">';
+                html += '<col class="incorrect-cell" style="width:120px;min-width:120px;max-width:140px;">';
+                for (let q = startQ; q <= endQ; q++) {
+                    html += '<col class="answer-cell" style="width:36px;min-width:36px;max-width:36px;">';
+                }
+                for (let q = endQ + 1; q <= startQ + QUESTIONS_PER_ROW - 1; q++) {
+                    html += '<col class="answer-cell" style="width:36px;min-width:36px;max-width:36px;">';
+                }
+                html += '</colgroup>';
+                html += '<thead>';
+                html += '<tr>';
+                html += '<th class="answer-cell student-id" style="color:#222; position: sticky; left: 0; background: #fff; z-index: 3;">Student ID#</th>';
+                html += '<th class="answer-cell score-cell" style="color:#222; position: sticky; left: 140px; background: #fff; z-index: 3;">Score</th>';
+                html += '<th class="answer-cell correct-cell" style="color:#222; position: sticky; left: 220px; background: #fff; z-index: 3;">Correct</th>';
+                html += '<th class="answer-cell incorrect-cell" style="color:#222; position: sticky; left: 320px; background: #fff; z-index: 3;">Incorrect</th>';
+                for (let q = startQ; q <= endQ; q++) {
+                    html += `<th class="answer-cell">Q${q}</th>`;
+                }
+                for (let q = endQ + 1; q <= startQ + QUESTIONS_PER_ROW - 1; q++) {
+                    html += `<th class="answer-cell"></th>`;
+                }
+                html += '</tr>';
+                html += '<tr class="answer-key-row">';
+                html += '<td class="answer-cell student-id" style="background:#d4edff !important; position: sticky; left: 0; z-index: 2;"><strong>Answer Key</strong></td>';
+                html += '<td class="answer-cell score-cell" style="background:#d4edff !important; position: sticky; left: 140px; z-index: 2;"></td>';
+                html += '<td class="answer-cell correct-cell" style="background:#d4edff !important; position: sticky; left: 220px; z-index: 2;"></td>';
+                html += '<td class="answer-cell incorrect-cell" style="background:#d4edff !important; position: sticky; left: 320px; z-index: 2;"></td>';
+                for (let q = startQ; q <= endQ; q++) {
+                    html += `<td class="answer-cell"><strong>${answerKey[String(q)] || '-'}</strong></td>`;
+                }
+                for (let q = endQ + 1; q <= startQ + QUESTIONS_PER_ROW - 1; q++) {
+                    html += '<td class="answer-cell"></td>';
+                }
+                html += '</tr>';
+                html += '</thead>';
+                html += '<tbody>';
+                uniqueResults.forEach((result, idx) => {
+                    html += `<tr class="student-row">`;
+                    html += `<td class="answer-cell student-id" style="position: sticky; left: 0; background: #fff; z-index: 1;">${result.studentId || ''}</td>`;
+                    const score = calculateScore(result.answers, answerKey, testName);
+                    html += `<td class="answer-cell score-cell" style="position: sticky; left: 140px; background: #fff; z-index: 1;">${score.points}</td>`;
+                    html += `<td class="answer-cell correct-cell" style="position: sticky; left: 220px; background: #fff; z-index: 1;">${score.correct}</td>`;
+                    html += `<td class="answer-cell incorrect-cell" style="position: sticky; left: 320px; background: #fff; z-index: 1;">${score.incorrect}</td>`;
+                    for (let q = startQ; q <= endQ; q++) {
+                        const qStr = String(q);
+                        let studentAnswer = result.answers[qStr];
+                        if (studentAnswer === undefined || studentAnswer === null) studentAnswer = '';
+                        if (typeof studentAnswer === 'string') studentAnswer = studentAnswer.trim();
+                        const correctAnswer = answerKey[qStr] || '';
+                        const isBlank = studentAnswer === '' || studentAnswer === '--';
+                        const isCorrect = !isBlank && correctAnswer && studentAnswer.toUpperCase() === correctAnswer.toUpperCase();
+                        let cellClass = 'answer-cell';
+                        // Only highlight as incorrect if not blank and not correct
+                        if (!isBlank && !isCorrect) {
+                            cellClass += ' incorrect-answer';
+                        }
+                        // If blank, show '--'
+                        html += `<td class=\"${cellClass}\">${isBlank ? '--' : studentAnswer}</td>`;
+                    }
+                    for (let q = endQ + 1; q <= startQ + QUESTIONS_PER_ROW - 1; q++) {
+                        html += '<td class="answer-cell"></td>';
+                    }
+                    html += '</tr>';
+                });
+                html += '</tbody>';
+                html += '</table>';
+                html += '</div>';
+                html += '</div>';
+            }
+            html += '</div>';
+            return html;
+        }
+
+        // Calculate score for a student using test-specific scoring formula
+        function calculateScore(answers, answerKey, testName) {
+            if (typeof testName === 'undefined') testName = '';
+            console.log('calculateScore called with testName:', testName);
+            let correct = 0;
+            let incorrect = 0;
+            let total = 0;
+            let tiebreakerCorrect = 0;
+
+            // Get scoring configuration for this test
+            const config = scoringConfigs[testName] || scoringConfigs['Default'];
+            console.log('Using config:', config, 'for test:', testName);
+            
+            // For Chess Puzzle, questions 1-20 are main, 21-28 are tiebreaker
+            const isChessPuzzle = testName.includes('Chess Puzzle');
+            const tiebreakerStart = isChessPuzzle ? 21 : 999; // Questions 21+ are tiebreaker
+
+            // Count correct and incorrect answers, ignore blanks
+            Object.keys(answerKey).forEach(q => {
+                const qNum = Number(q);
+                const qStr = String(q);
+                let studentAnswer = answers[qStr];
+                const correctAnswer = answerKey[qStr] || '';
+                // Normalize blank/empty answers
+                if (studentAnswer === undefined || studentAnswer === null) studentAnswer = '';
+                if (typeof studentAnswer === 'string') studentAnswer = studentAnswer.trim().toUpperCase();
+                // Treat '--' and '' as blank
+                const isBlank = studentAnswer === '' || studentAnswer === '--';
+                if (isBlank) {
+                    // Do not count blank answers as incorrect or correct
+                    return;
+                }
+                if (correctAnswer) {
+                    total++;
+                    if (studentAnswer === correctAnswer.toUpperCase()) {
+                        if (isChessPuzzle && qNum >= tiebreakerStart) {
+                            tiebreakerCorrect++;
+                        } else {
+                            correct++;
+                        }
+                    } else {
+                        incorrect++;
+                    }
+                }
+            });
+
+            // Calculate points using the test's formula
+            let totalScore = (correct * config.correctPoints) + (incorrect * config.incorrectPoints);
+            
+            console.log('Score calculation:', {
+                correct,
+                incorrect,
+                correctPoints: config.correctPoints,
+                incorrectPoints: config.incorrectPoints,
+                totalScore,
+                testName
+            });
+
+            // Add tiebreaker points if applicable (Chess Puzzle)
+            if (config.tiebreaker && tiebreakerCorrect > 0) {
+                totalScore += tiebreakerCorrect * config.tiebreaker;
+            }
+            
+            // Format score to 2 decimals for Chess Puzzle
+            if (isChessPuzzle) {
+                totalScore = parseFloat(totalScore.toFixed(2));
+            }
+
+            // Calculate max possible points
+            let maxPossiblePoints;
+            if (isChessPuzzle) {
+                // For Chess Puzzle: 20 regular questions (1 point each) + 8 tiebreaker questions (0.01 each)
+                const regularQuestions = 20;
+                const tiebreakerQuestions = 8;
+                maxPossiblePoints = parseFloat(((regularQuestions * config.correctPoints) + (tiebreakerQuestions * config.tiebreaker)).toFixed(2));
+            } else {
+                maxPossiblePoints = (correct + incorrect) * config.correctPoints;
+            }
+
+            return { 
+                correct, 
+                incorrect, 
+                total, 
+                points: totalScore,
+                tiebreakerCorrect: tiebreakerCorrect,
+                maxPossiblePoints: maxPossiblePoints,
+                description: config.description
+            };
+        }
+
+
+
+        // Update summary statistics
+    function updateSummaryStats() {
+            // Remove summary-stats header to prevent floating blue header
+            document.getElementById('summary-stats').innerHTML = '';
+        }
+
+        // Toggle between horizontal and vertical views
+        let currentView = 'horizontal'; // 'horizontal' or 'vertical'
+        
+        function toggleView() {
+            console.log('toggleView called, currentView:', currentView);
+            const horizontalContainer = document.getElementById('results-container');
+            const verticalContainer = document.getElementById('vertical-results-container');
+            const toggleBtn = document.getElementById('toggle-view-btn');
+            
+            console.log('horizontalContainer:', horizontalContainer);
+            console.log('verticalContainer:', verticalContainer);
+            console.log('verticalContainer.hasChildNodes():', verticalContainer ? verticalContainer.hasChildNodes() : 'null');
+            
+            if (currentView === 'horizontal') {
+                // Switch to vertical view
+                document.body.classList.add('vertical-view-active');
+                horizontalContainer.style.display = 'none';
+                verticalContainer.style.display = 'block';
+                toggleBtn.textContent = 'Switch to Horizontal View';
+                currentView = 'vertical';
+                
+                console.log('About to check if we need to generate vertical view...');
+                // Only generate if not already generated (check for actual content, not just whitespace)
+                if (!verticalContainer.querySelector('.vertical-view-container')) {
+                    console.log('Calling generateVerticalView now...');
+                    generateVerticalView();
+                } else {
+                    console.log('Vertical view already has content, skipping generation');
+                }
+            } else {
+                // Switch to horizontal view
+                document.body.classList.remove('vertical-view-active');
+                horizontalContainer.style.display = 'block';
+                verticalContainer.style.display = 'none';
+                toggleBtn.textContent = 'Switch to Vertical View';
+                currentView = 'horizontal';
+            }
+        }
+        
+        // Generate vertical comparison view (like official answer key) - OPTIMIZED
+        function generateVerticalView() {
+            console.log('generateVerticalView called');
+            if (!allResults || allResults.length === 0) {
+                document.getElementById('vertical-results-container').innerHTML = 
+                    '<div style="text-align: center; padding: 2em; color: #c00;">' +
+                    '<h3>No results found</h3>' +
+                    '<p>No scan data is available for vertical view. Please scan bubble sheets and generate a teacher verification report first.</p>' +
+                    '<a href="/simple_scan" style="color: #007bff;">Go to Scanner</a>' +
+                    '</div>';
+                console.error('Vertical view: allResults is empty or missing.');
+                return;
+            }
+            try {
+                // Deduplicate results by studentId - keep only the first occurrence
+                const uniqueResults = [];
+                const seenIds = new Set();
+                allResults.forEach(result => {
+                    if (!seenIds.has(result.studentId)) {
+                        seenIds.add(result.studentId);
+                        uniqueResults.push(result);
+                    }
+                });
+                let html = '';
+                // Group by school code, then by test
+                const grouped = groupResultsBySchoolAndTest(uniqueResults);
+                let cardCount = 0;
+                Object.keys(grouped).sort().forEach((schoolCode) => {
+                    // Map school code to name for display
+                    const schoolName = schoolMap && schoolMap[schoolCode] ? schoolMap[schoolCode] : `School ${schoolCode}`;
+                    // Gather all results for this school, grouped by test and grade
+                    const testGradeMap = {};
+                    Object.keys(grouped[schoolCode]).forEach((testName) => {
+                        const results = grouped[schoolCode][testName];
+                        results.forEach(r => {
+                            let grade = r.grade;
+                            if (!testGradeMap[testName]) testGradeMap[testName] = {};
+                            if (!testGradeMap[testName][grade]) testGradeMap[testName][grade] = [];
+                            testGradeMap[testName][grade].push(r);
+                        });
+                    });
+                    // Output school header once per school, with print-only header for print
+                    html += `<div class=\"vertical-view-container\">`;
+                    Object.keys(testGradeMap).forEach((testName) => {
+                        // Remove grade suffixes for display
+                        let displayTestName = testName
+                            .replace(/ - \d+(st|nd|rd|th) Grade$/i, '')
+                            .replace(/ - \d+(st|nd|rd|th) & \d+(st|nd|rd|th) Grades$/i, '')
+                            .replace(/ - Grades \d+-\d+$/i, '')
+                            .replace(/ \d+(st|nd|rd|th)$/i, '')
+                            .trim();
+                        Object.keys(testGradeMap[testName]).sort().forEach((grade, groupIdx) => {
+                            const results = testGradeMap[testName][grade];
+                            if (results.length === 0) return;
+                            const gradeLabel = grade === '6' ? '6th Grade' : (grade === '7' ? '7th Grade' : (grade === '8' ? '8th Grade' : `Grade ${grade}`));
+                            // Print-only header block for each group
+                            html += `<div class=\"print-only print-header-table\" style=\"page-break-before: always; margin-bottom: 0.5em;\">`;
+                            html += `<table style=\"width:100%;\"><thead><tr><th style=\"font-size:2em; color:#007bff; text-align:left; padding:0.2em 0;\">Teacher Verification Report</th></tr></thead></table>`;
+                            html += `<div style=\"font-size:1.25em; color:#007bff; font-weight:bold; margin-left:0.2em; margin-bottom:0.1em;\">${schoolName}</div>`;
+                            html += `<div style=\"font-size:1.1em; color:#495057; font-weight:bold; margin-left:0.4em; margin-bottom:0.1em;\">${displayTestName}</div>`;
+                            html += `<div style=\"font-size:1em; color:#495057; margin-left:0.6em; margin-bottom:0.5em;\">${gradeLabel}</div>`;
+                            html += `</div>`;
+                            // Screen-only header block for each group
+                            html += `<div class=\"screen-only vertical-header-table\" style=\"margin-bottom: 0.5em;\">`;
+                            html += `<table style=\"width:100%;\"><thead><tr><th style=\"font-size:2em; color:#007bff; text-align:left; padding:0.2em 0;\">Teacher Verification Report</th></tr></thead></table>`;
+                            html += `<div style=\"font-size:1.25em; color:#007bff; font-weight:bold; margin-left:0.2em; margin-bottom:0.1em;\">${schoolName}</div>`;
+                            html += `<div style=\"font-size:1.1em; color:#495057; font-weight:bold; margin-left:0.4em; margin-bottom:0.1em;\">${displayTestName}</div>`;
+                            html += `<div style=\"font-size:1em; color:#495057; margin-left:0.6em; margin-bottom:0.5em;\">${gradeLabel}</div>`;
+                            html += `</div>`;
+                            const maxQuestionsOverall = Math.max(1, ...results.map(r => Object.keys(r.answers || {}).map(Number)).flat());
+                            // Normalize test name for testLayouts lookup
+                            let normalizedTestName = testName
+                                .replace(/ - \d+(st|nd|rd|th) Grade$/i, '')
+                                .replace(/ - \d+(st|nd|rd|th) & \d+(st|nd|rd|th) Grades$/i, '')
+                                .replace(/ - Grades \d+-\d+$/i, '')
+                                .replace(/ \d+(st|nd|rd|th)$/i, '')
+                                .trim();
+                            // Force 3-column layout for any test name containing 'Maps, Graphs, & Charts' or 'Science'
+                            let testLayout;
+                            let forceThreeColClass = '';
+                            if (/Maps,? Graphs,? & Charts/i.test(testName) || /Maps,? Graphs,? & Charts/i.test(displayTestName) || /Maps,? Graphs,? & Charts/i.test(normalizedTestName)) {
+                                testLayout = testLayouts['Maps, Graphs, & Charts 6th'] || { columns: 3, ranges: [[1, 25], [26, 50], [51, 75]] };
+                                forceThreeColClass = 'three-col-maps';
+                            } else if (/Science/i.test(testName) || /Science/i.test(displayTestName) || /Science/i.test(normalizedTestName)) {
+                                testLayout = testLayouts['Science 6th'] || { columns: 3, ranges: [[1, 17], [18, 34], [35, 50]] };
+                                forceThreeColClass = 'three-col-science';
+                            } else {
+                                testLayout = testLayouts[testName] || testLayouts[displayTestName] || testLayouts[normalizedTestName] || { columns: 2, ranges: [[1, maxQuestionsOverall]] };
+                            }
+
+                            let maxQuestionsPerColumn = 0;
+                            if (testLayout.sections) {
+                                testLayout.sections.forEach(section => {
+                                    section.ranges.forEach(([start, end]) => {
+                                        const questionsInRange = end - start + 1;
+                                        maxQuestionsPerColumn = Math.max(maxQuestionsPerColumn, questionsInRange);
+                                    });
+                                });
+                            } else {
+                                testLayout.ranges.forEach(([start, end]) => {
+                                    const questionsInRange = end - start + 1;
+                                    maxQuestionsPerColumn = Math.max(maxQuestionsPerColumn, questionsInRange);
+                                });
+                            }
+                            let sizeClass = '';
+                            if (maxQuestionsPerColumn <= 15) {
+                                sizeClass = 'size-small';
+                            } else if (maxQuestionsPerColumn <= 20) {
+                                sizeClass = 'size-medium';
+                            } else {
+                                sizeClass = 'size-large';
+                            }
+
+                            html += `<div class=\"grade-group ${testLayout.columns === 3 ? 'three-column-test' : ''}\">`;
+
+                            results.forEach(result => {
+                                cardCount++;
+                                const answerKey = result.answerKey || {};
+                                const maxQ = Math.max(1, ...Object.keys(result.answers || {}).map(Number)); // Ensure maxQ is at least 1
+                                // Patch: filter out blanks for score calculation
+                                function filteredAnswersForScore(answers) {
+                                    const filtered = {};
+                                    Object.keys(answers || {}).forEach(k => {
+                                        let v = answers[k];
+                                        if (v === undefined || v === null) v = '';
+                                        if (typeof v === 'string') v = v.trim();
+                                        if (v !== '' && v !== '--') filtered[k] = v;
+                                    });
+                                    return filtered;
+                                }
+                                const score = calculateScore(filteredAnswersForScore(result.answers), answerKey, testName);
+
+                                html += `<div class=\"vertical-student-card ${sizeClass}\">`;
+                                html += `<div class=\"vertical-student-header\">`;
+                                html += `<div class=\"vertical-header-row\">`;
+                                html += `<div class=\"vertical-header-cell id-label-cell\"><strong><span class=\"id-label\">Student ID#</span></strong></div>`;
+                                html += `<div class=\"vertical-header-cell score-cell\"><strong>Correct:</strong> ${score.correct}</div>`;
+                                html += `</div>`;
+                                html += `<div class=\"vertical-header-row\">`;
+                                html += `<div class=\"vertical-header-cell id-value-cell\"><strong>${result.studentId}</strong></div>`;
+                                html += `<div class=\"vertical-header-cell incorrect-cell\"><strong><span class=\"incorrect-highlight\">Incorrect: ${score.incorrect}</span></strong></div>`;
+                                html += `</div>`;
+                                html += `<div class=\"vertical-header-row score-row\">`;
+                                html += `<div class=\"vertical-header-cell\"><strong><span class=\"score-highlight\">Score: ${score.points} out of ${score.maxPossiblePoints}</span></strong></div>`;
+                                html += `</div>`;
+                                html += `<div class=\"vertical-header-row initials-row\">`;
+                                html += `<div class=\"vertical-header-cell\"></div>`;
+                                html += `<div class=\"vertical-header-cell\"><strong>Initials: <span class=\"initials-line\">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></strong></div>`;
+                                html += `</div>`;
+                                html += `</div>`;
+                                if (testLayout.sections) {
+                                    testLayout.sections.forEach(section => {
+                                        html += `<h5 style=\"font-weight: bold; margin: 0.8em 0 0.3em 0; color: #495057;\">${section.title}</h5>`;
+                                        html += `<div class=\"vertical-answers-grid\" style=\"grid-template-columns: repeat(${section.columns}, 1fr);\">`;
+                                        let displayNum = 1;
+                                        section.ranges.forEach(([start, end], colIdx) => {
+                                            html += `<div class=\"vertical-column\">`;
+                                            for (let q = start; q <= end && q <= maxQ; q++) {
+                                                let studentAnswer = result.answers[String(q)];
+                                                if (studentAnswer === undefined || studentAnswer === null) studentAnswer = '';
+                                                if (typeof studentAnswer === 'string') studentAnswer = studentAnswer.trim();
+                                                const correctAnswer = answerKey[String(q)] || '-';
+                                                const isBlank = studentAnswer === '' || studentAnswer === '--';
+                                                const isCorrect = !isBlank && studentAnswer === correctAnswer;
+                                                const answerClass = isBlank ? '' : (isCorrect ? 'correct' : 'incorrect');
+                                                // For Chess tiebreaker, display 1-4 and 5-8 instead of 21-24 and 25-28
+                                                let questionLabel = q;
+                                                if (section.title === 'Tiebreaker' && testName.includes('Chess Puzzle')) {
+                                                    if (colIdx === 0) {
+                                                        questionLabel = q - 20; // 21-24 -> 1-4
+                                                    } else if (colIdx === 1) {
+                                                        questionLabel = q - 24; // 25-28 -> 1-4, but want 5-8
+                                                        questionLabel += 4;     // 1-4 -> 5-8
+                                                    }
+                                                } else if (section.title === 'Tiebreaker') {
+                                                    questionLabel = displayNum;
+                                                }
+                                                html += `<div class=\"vertical-answer-row\">`;
+                                                html += `<span class=\"vertical-question-num\">${questionLabel}.</span>`;
+                                                html += `<span class=\"vertical-answer${answerClass ? ' ' + answerClass : ''}\">${isBlank ? '--' : studentAnswer}</span>`;
+                                                html += `</div>`;
+                                                displayNum++;
+                                            }
+                                            html += `</div>`;
+                                        });
+                                        html += `</div>`;
+                                    });
+                                } else {
+                                    // Multi-column vertical answer grid using testLayout.ranges
+                                    html += `<div class=\"vertical-answers-grid ${forceThreeColClass}\" style=\"display: grid; grid-template-columns: repeat(${testLayout.columns}, 1fr); gap: 0.5em;\">`;
+                                    // Flatten all questions into a single array
+                                    let allQuestions = [];
+                                    testLayout.ranges.forEach(([start, end]) => {
+                                        for (let q = start; q <= end && q <= maxQ; q++) {
+                                            allQuestions.push(q);
+                                        }
+                                    });
+                                    // Split questions into columns
+                                    let questionsPerCol = Math.ceil(allQuestions.length / testLayout.columns);
+                                    for (let col = 0; col < testLayout.columns; col++) {
+                                        html += `<div class=\"vertical-column\">`;
+                                        for (let i = 0; i < questionsPerCol; i++) {
+                                            let idx = col * questionsPerCol + i;
+                                            if (idx >= allQuestions.length) break;
+                                            let q = allQuestions[idx];
+                                            let studentAnswer = result.answers[String(q)];
+                                            if (studentAnswer === undefined || studentAnswer === null) studentAnswer = '';
+                                            if (typeof studentAnswer === 'string') studentAnswer = studentAnswer.trim();
+                                            const correctAnswer = answerKey[String(q)] || '-';
+                                            const isBlank = studentAnswer === '' || studentAnswer === '--';
+                                            const isCorrect = !isBlank && studentAnswer === correctAnswer;
+                                            const answerClass = isBlank ? '' : (isCorrect ? 'correct' : 'incorrect');
+                                            html += `<div class=\"vertical-answer-row\">`;
+                                            html += `<span class=\"vertical-question-num\">${q}.</span>`;
+                                            html += `<span class=\"vertical-answer${answerClass ? ' ' + answerClass : ''}\">${isBlank ? '--' : studentAnswer}</span>`;
+                                            html += `</div>`;
+                                        }
+                                        html += `</div>`;
+                                    }
+                                    html += `</div>`;
+                                }
+                                html += `</div>`; // close .vertical-student-card
+                            }); // close results.forEach
+                            html += `</div>`; // close .grade-group
+                        });
+                    });
+                    html += `</div>`; // close .vertical-view-container
+                });
+                if (cardCount === 0) {
+                    document.getElementById('vertical-results-container').innerHTML =
+                        '<div style="text-align: center; padding: 2em; color: #c00;">' +
+                        '<h3>No student cards found</h3>' +
+                        '<p>There was a problem generating the vertical view. Please check your scan data and try again.</p>' +
+                        '</div>';
+                    console.error('Vertical view: No student cards were generated.');
+                } else {
+                    document.getElementById('vertical-results-container').innerHTML = html;
+                }
+            } catch (error) {
+                document.getElementById('vertical-results-container').innerHTML =
+                    '<div style="text-align: center; padding: 2em; color: #c00;">' +
+                    '<h3>Error generating vertical view</h3>' +
+                    '<p>' + (error && error.message ? error.message : error) + '</p>' +
+                    '</div>';
+                console.error("Error generating vertical view:", error);
+            }
+        }
+
+
+        // Clear all stored results
+    function clearAllResults() {
+            if (confirm('Are you sure you want to clear all verification results? This cannot be undone.')) {
+                localStorage.removeItem('teacherVerificationResults');
+                allResults = [];
+                loadResults(); // This will show the "No results found" message in horizontal view
+                // Also clear the vertical view
+                document.getElementById('vertical-results-container').innerHTML = 
+                    '<div style="text-align: center; padding: 2em; color: #6c757d;">' +
+                    '<h3>No results found</h3>' +
+                    '<p>Please scan bubble sheets first to generate verification results.</p>' +
+                    '<a href="/simple_scan" style="color: #007bff;">Go to Scanner</a>' +
+                    '</div>';
+            }
+        }
+
+
+
+        // Export to CSV format
+    function exportToCSV() {
+        if (!allResults || allResults.length === 0) {
+            alert('No results to export');
+            return;
+        }
+
+        // Group by test and grade
+        const groupedResults = groupResultsByTestAndGrade();
+        let csv = '';
+        let filename = '';
+        let firstTest = null;
+        let firstGrade = null;
+        // Compose CSV for each test/grade
+        Object.keys(groupedResults).forEach(testName => {
+            const testResults = groupedResults[testName];
+            if (!testResults || testResults.length === 0) return;
+            // Use first result for grade
+            const grade = testResults[0].grade || '';
+                // Use only the base test name for CSV column (strip all grade and extra info)
+                let shortName = shortTestNames[testName] || testName;
+                shortName = shortName.replace(/ - .*/, '');
+                shortName = shortName.replace(/\s*\d+(st|nd|rd|th)?$/, '');
+                shortName = shortName.replace(/Grades?\s*\d+(-\d+)?/, '');
+                shortName = shortName.replace(/\s*-\s*$/, '');
+                shortName = shortName.trim();
+            if (!firstTest) firstTest = testName;
+            if (!firstGrade) firstGrade = grade;
+            // Find max questions for this test (check both answers and answer key)
+            const answerKey = testResults[0].answerKey || {};
+            const maxFromAnswers = Math.max(0, ...testResults.map(r => {
+                const keys = Object.keys(r.answers || {});
+                return keys.length > 0 ? Math.max(...keys.map(k => parseInt(k))) : 0;
+            }));
+            const maxFromKey = Object.keys(answerKey).length > 0 ? Math.max(...Object.keys(answerKey).map(k => parseInt(k))) : 0;
+            const maxQuestions = Math.max(maxFromAnswers, maxFromKey);
+            
+            // Check if this is Chess Puzzle for tiebreaker labeling
+            const isChessPuzzle = testName.includes('Chess Puzzle');
+            
+            // Header
+            csv += "Event,Test Name,Grade,Event+ID,Student ID,Score,Correct,Incorrect";
+            for (let q = 1; q <= maxQuestions; q++) {
+                // Label tiebreaker questions (21-28) as TB1-TB8 for Chess Puzzle
+                if (isChessPuzzle && q >= 21 && q <= 28) {
+                    csv += ",TB" + (q - 20);
+                } else {
+                    csv += ",Q" + q;
+                }
+            }
+            csv += "\n";
+            // Answer key row (answerKey already declared above)
+                // Create standardized event name for answer key row
+                let answerKeyEventName = shortName
+                    .replace('Art Part B', 'Art')
+                    .replace('Dictionary Skills', 'Dictionary')
+                    .replace('Maps, Graphs, & Charts', 'Maps')
+                    .replace('Social Studies', 'SocialStudies')
+                    .replace(/\s+/g, '') + ' ' + grade;
+                csv += '"' + answerKeyEventName + '","' + shortName + '","' + grade + '",,,,,"Answer Key"';
+            for (let q = 1; q <= maxQuestions; q++) {
+                csv += ',"' + (answerKey[q] || '') + '"';
+            }
+            csv += "\n";
+            // Deduplicate student rows by studentId
+            // Sort results by studentId (as string, so leading digits matter)
+            const uniqueResults = [];
+            const seenStudentIds = new Set();
+            testResults.forEach(result => {
+                if (!seenStudentIds.has(result.studentId)) {
+                    seenStudentIds.add(result.studentId);
+                    uniqueResults.push(result);
+                }
+            });
+            uniqueResults.sort((a, b) => String(a.studentId).localeCompare(String(b.studentId)));
+            uniqueResults.forEach(result => {
+                // Always use the correct grade for each student
+                const studentGrade = (result.parsedInfo && result.parsedInfo.grade) ? result.parsedInfo.grade : (parseStudentId(result.studentId).grade);
+                const score = calculateScore(result.answers, answerKey, testName);
+                    // Create standardized event name and combined Event+StudentID
+                    let eventName = shortName
+                        .replace('Art Part B', 'Art')
+                        .replace('Dictionary Skills', 'Dictionary')
+                        .replace('Maps, Graphs, & Charts', 'Maps')
+                        .replace('Social Studies', 'SocialStudies')
+                        .replace(/\s+/g, '') + ' ' + studentGrade;
+                    let eventIdCombo = eventName + result.studentId;
+                    // Format: Event, Test Name, Grade, Event+ID, Student ID, Score, Correct, Incorrect
+                    csv += '"' + eventName + '","' + shortName + '","' + studentGrade + '","' + eventIdCombo + '","' + result.studentId + '",' + score.points + ',' + score.correct + ',' + score.incorrect;
+                for (let q = 1; q <= maxQuestions; q++) {
+                    csv += ',"' + (result.answers[q] || '') + '"';
+                }
+                csv += "\n";
+            });
+            csv += "\n";
+        }); // End of Object.keys(groupedResults).forEach
+        // Set filename to standardized event name and date
+        if (firstTest) {
+            // Create standardized base name
+            let baseTestName = firstTest
+                .replace(/ - \d+(st|nd|rd|th) Grade$/i, '')
+                .replace(/ - \d+(st|nd|rd|th) & \d+(st|nd|rd|th) Grades$/i, '')
+                .replace(/ - Grades \d+-\d+$/i, '')
+                .replace(/ \d+(st|nd|rd|th)$/i, '')
+                .replace('Art Part B', 'Art')
+                .replace('Dictionary Skills', 'Dictionary')
+                .replace('Maps, Graphs, & Charts', 'Maps')
+                .replace('Social Studies', 'SocialStudies')
+                .replace(/\s+/g, '');
+            // Clean up grade for filename
+            let gradePart = (firstGrade || '').toString().replace(/[^A-Za-z0-9]/g, '');
+            // Format date as MM-DD-YY
+            let d = new Date();
+            let mm = String(d.getMonth() + 1).padStart(2, '0');
+            let dd = String(d.getDate()).padStart(2, '0');
+            let yy = String(d.getFullYear()).slice(-2);
+            let datePart = mm + "-" + dd + "-" + yy;
+            filename = baseTestName + gradePart + "_" + datePart + ".csv";
+        } else {
+            filename = "Teacher_Verification_" + (new Date().toISOString().slice(0,10)) + ".csv";
+        }
+        // Download CSV file
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } // End of exportToCSV
+
+        // Export to Excel format with formatting
+    function exportToExcel() {
+            if (allResults.length === 0) {
+                alert('No data to export');
+                return;
+            }
+
+            // Create a new workbook
+            const wb = XLSX.utils.book_new();
+            
+            // Group results by school and test
+            const excelGroupedResults = groupResultsBySchoolAndTest();
+            
+            // Create data for the worksheet
+            const worksheetData = [];
+
+            Object.keys(excelGroupedResults).forEach(schoolName => {
+                const schoolResults = excelGroupedResults[schoolName];
+                
+                Object.keys(schoolResults).forEach(testName => {
+                    const testResults = schoolResults[testName];
+                    const answerKey = testResults.answerKey;
+                    
+                    // Add school and test header
+                    worksheetData.push([]);
+                    worksheetData.push([schoolName + " - " + testName]);
+                    worksheetData.push([]);
+                    
+                    // Determine max questions
+                    let maxQuestions = 0;
+                    testResults.results.forEach(result => {
+                        const questionCount = Object.keys(result.answers).length;
+                        if (questionCount > maxQuestions) maxQuestions = questionCount;
+                    });
+                    
+                    if (answerKey) {
+                        const keyQuestionCount = Object.keys(answerKey).length;
+                        if (keyQuestionCount > maxQuestions) maxQuestions = keyQuestionCount;
+                    }
+                    
+                    // Create headers
+                    const headers = ['Student ID', 'Score', 'Correct', 'Incorrect'];
+                    for (let q = 1; q <= maxQuestions; q++) {
+                        headers.push("Q" + q);
+                    }
+                    worksheetData.push(headers);
+                    
+                    // Add answer key row
+                    if (answerKey) {
+                        const keyRow = ['ANSWER KEY', '', '', ''];
+                        for (let q = 1; q <= maxQuestions; q++) {
+                            keyRow.push(answerKey[q] || '');
+                        }
+                        worksheetData.push(keyRow);
+                    }
+                    
+                    // Add student data
+                    testResults.results.forEach(result => {
+                        const score = calculateScore(result.answers, answerKey, testName);
+                        
+                        const row = [
+                            result.studentId || 'N/A',
+                            score.points,
+                            score.correct,
+                            score.incorrect
+                        ];
+                        
+                        for (let q = 1; q <= maxQuestions; q++) {
+                            row.push(result.answers[q] || '');
+                        }
+                        
+                        worksheetData.push(row);
+                    });
+                    
+                    worksheetData.push([]); // Blank row between sections
+                });
+            });
+
+            // Group by test and grade
+            const groupedResults = groupResultsByTestAndGrade();
+            let csv = '';
+            let excelFilename = '';
+            let firstTest = null;
+            let firstGrade = null;
+            // Compose CSV for each test/grade
+            Object.keys(groupedResults).forEach(testName => {
+                const testResults = groupedResults[testName];
+                if (!testResults || testResults.length === 0) return;
+                // Use first result for grade
+                const grade = testResults[0].grade || '';
+                if (!firstTest) firstTest = testName;
+                if (!firstGrade) firstGrade = grade;
+                // Find max questions for this test
+                const answerKey = testResults[0].answerKey || {};
+                const maxFromAnswers = Math.max(0, ...testResults.map(r => {
+                    const keys = Object.keys(r.answers || {});
+                    return keys.length > 0 ? Math.max(...keys.map(k => parseInt(k))) : 0;
+                }));
+                const maxFromKey = Object.keys(answerKey).length > 0 ? Math.max(...Object.keys(answerKey).map(k => parseInt(k))) : 0;
+                const maxQuestions = Math.max(maxFromAnswers, maxFromKey);
+                // Header
+                csv += "Test Name,Grade,Student ID,Score,Correct,Incorrect";
+                for (let q = 1; q <= maxQuestions; q++) {
+                    csv += ",Q" + q;
+                }
+                csv += "\n";
+                // Answer key row (answerKey already declared above)
+                csv += '"' + testName + '","' + grade + '",Answer Key,,,';
+                for (let q = 1; q <= maxQuestions; q++) {
+                    csv += ',"' + (answerKey[q] || '') + '"';
+                }
+                csv += "\n";
+                // Deduplicate student rows by studentId
+                const seenStudentIds = new Set();
+                testResults.forEach(result => {
+                    if (seenStudentIds.has(result.studentId)) return;
+                    seenStudentIds.add(result.studentId);
+                    // Always use the correct grade for each student
+                    const studentGrade = (result.parsedInfo && result.parsedInfo.grade) ? result.parsedInfo.grade : (parseStudentId(result.studentId).grade);
+                    const score = calculateScore(result.answers, answerKey, testName);
+                    csv += '"' + testName + '","' + studentGrade + '","' + result.studentId + '",' + score.points + ',' + score.correct + ',' + score.incorrect;
+                    for (let q = 1; q <= maxQuestions; q++) {
+                        csv += ',"' + (result.answers[q] || '') + '"';
+                    }
+                    csv += "\n";
+                });
+                csv += "\n";
+            });
+            // Set filename to just the test name (as on vertical cards) and date
+            if (firstTest) {
+                // Remove grade and extra info from test name for filename
+                let baseTestName = firstTest
+                    .replace(/ - \d+(st|nd|rd|th) Grade$/i, '')
+                    .replace(/ - \d+(st|nd|rd|th) & \d+(st|nd|rd|th) Grades$/i, '')
+                    .replace(/ - Grades \d+-\d+$/i, '')
+                    .replace(/ \d+(st|nd|rd|th)$/i, '')
+                    .replace(/[^A-Za-z0-9_]/g, '_')
+                    .replace(/_+/g, '_')
+                    .replace(/^_+|_+$/g, '');
+                filename = baseTestName + "-" + (new Date().toISOString().slice(0,10)) + ".csv";
+            } else {
+                filename = "Teacher_Verification_" + (new Date().toISOString().slice(0,10)) + ".csv";
+            }
+
+            // Add worksheet to workbook
+            XLSX.utils.book_append_sheet(wb, ws, "Teacher Verification");
+
+            // Generate filename and save
+            excelFilename = "Teacher_Verification_" + (new Date().toISOString().slice(0,10)) + ".xlsx";
+            XLSX.writeFile(wb, excelFilename);
+        }
+
+        // Public function to add results (called from scanning page)
+    window.addResultsForVerification = function(results, testName, answerKey) {
+            // Convert answer key string (or object) to normalized object
+            const answerKeyObj = {};
+            if (answerKey && typeof answerKey === 'string') {
+                safeSplit(answerKey).forEach(pair => {
+                    if (pair && pair.trim()) {
+                        const parts = pair.split(':');
+                        const q = parts[0];
+                        const a = parts.slice(1).join(':');
+                        if (q && a) answerKeyObj[parseInt(q.trim())] = a.trim().toUpperCase();
+                    }
+                });
+            } else if (answerKey && typeof answerKey === 'object') {
+                // Already an object; copy values (ensure uppercase)
+                Object.keys(answerKey).forEach(k => {
+                    answerKeyObj[parseInt(k)] = (answerKey[k] || '').toString().trim().toUpperCase();
+                });
+            }
+
+            // Process each result, normalize answers keys to strings
+            results.forEach(result => {
+                const normalizedAnswers = {};
+                if (result.answers && typeof result.answers === 'object') {
+                    Object.keys(result.answers).forEach(k => {
+                        normalizedAnswers[String(k)] = result.answers[k];
+                    });
+                }
+                allResults.push({
+                    testName: testName,
+                    studentId: result.student_id,
+                    answers: normalizedAnswers,
+                    answerKey: answerKeyObj,
+                    timestamp: new Date().toISOString()
+                });
+            });
+
+            // Save to localStorage
+            localStorage.setItem('teacherVerificationResults', JSON.stringify(allResults));
+            
+            // Refresh display
+            displayResults();
+        };
+    </script>
+</body>
+</html>

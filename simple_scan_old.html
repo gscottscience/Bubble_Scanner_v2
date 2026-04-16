@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Bubble Sheet Scanner</title>
+    <style>
+        body { font-family: sans-serif; background: #f4f4f9; color: #222; margin: 2em; }
+        h1 { color: #444; }
+        form { background: #fff; padding: 2em; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); max-width: 500px; margin-bottom: 2em; }
+        label { font-weight: bold; display: block; margin-bottom: 0.5em; }
+        input[type=file] { margin-bottom: 1em; }
+        button { background: #007bff; color: #fff; border: none; border-radius: 4px; padding: 0.7em 1.5em; font-size: 1em; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        #results { background: #fff; padding: 1em; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-top: 2em; }
+    </style>
+</head>
+<body>
+    <h1>Simple Bubble Sheet Scanner</h1>
+    <form id="scan-form" enctype="multipart/form-data">
+        <label for="sheet-file">Upload Bubble Sheet (PDF or Image):</label>
+        <input type="file" id="sheet-file" name="sheet_file" accept=".pdf,.png,.jpg,.jpeg,image/*" required>
+        <button type="submit">Scan Sheet</button>
+    </form>
+    <div id="results"></div>
+    <script>
+    alert('JS IS RUNNING');
+    document.getElementById('scan-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const fileInput = document.getElementById('sheet-file');
+        const file = fileInput.files[0];
+        if (!file) return;
+        const formData = new FormData();
+        formData.append('sheet_file', file);
+        document.getElementById('results').innerHTML = 'Scanning...';
+        const response = await fetch('/api/simple_scan', { method: 'POST', body: formData });
+        const data = await response.json();
+        alert('SCAN RESPONSE: ' + JSON.stringify(data));
+        if (data.error) {
+            document.getElementById('results').innerHTML = '<span style="color:#c00">Error: ' + data.error + '</span>';
+            return;
+        }
+        let html = '<h2>Results</h2>';
+        if (data.results && data.results.length) {
+            data.results.forEach((res) => {
+                html += `<div style="margin-bottom:2em; padding:1em; border:1px solid #ccc; border-radius:8px; background:#fafbfc;">`;
+                html += `<h3>Page ${res.page !== undefined ? res.page : ''}</h3>`;
+                if (res.debug_image_url) {
+                    html += `<div><img src="${res.debug_image_url}" alt="Debug Image" style="max-width:400px; border:1px solid #888; margin-bottom:1em;"></div>`;
+                }
+                html += `<b>Student ID:</b> ${res.student_id || '(not detected)'}<br><br>`;
+            });
+        } else {
+            html += '<i>No results found.</i>';
+        }
+        document.getElementById('results').innerHTML = html;
+    });
+    </script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Bubble Sheet Scanner</title>
+    <style>
+        body { font-family: sans-serif; background: #f4f4f9; color: #222; margin: 2em; }
+        h1 { color: #444; }
+        form { background: #fff; padding: 2em; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); max-width: 500px; margin-bottom: 2em; }
+        label { font-weight: bold; display: block; margin-bottom: 0.5em; }
+        input[type=file] { margin-bottom: 1em; }
+        button { background: #007bff; color: #fff; border: none; border-radius: 4px; padding: 0.7em 1.5em; font-size: 1em; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        #results { background: #fff; padding: 1em; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-top: 2em; }
+    </style>
+</head>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Bubble Sheet Scanner</title>
+    <style>
+        body { font-family: sans-serif; background: #f4f4f9; color: #222; margin: 2em; }
+        h1 { color: #444; }
+        form { background: #fff; padding: 2em; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); max-width: 500px; margin-bottom: 2em; }
+        label { font-weight: bold; display: block; margin-bottom: 0.5em; }
+        input[type=file] { margin-bottom: 1em; }
+        button { background: #007bff; color: #fff; border: none; border-radius: 4px; padding: 0.7em 1.5em; font-size: 1em; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        #results { background: #fff; padding: 1em; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-top: 2em; }
+    </style>
+</head>
+<body>
+    <h1>Simple Bubble Sheet Scanner</h1>
+    <form id="scan-form" enctype="multipart/form-data">
+        <label for="sheet-file">Upload Bubble Sheet (PDF or Image):</label>
+        <input type="file" id="sheet-file" name="sheet_file" accept=".pdf,.png,.jpg,.jpeg,image/*" required>
+        <button type="submit">Scan Sheet</button>
+    </form>
+    <div id="results"></div>
+    <script>
+    alert('JS IS RUNNING');
+    document.getElementById('scan-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const fileInput = document.getElementById('sheet-file');
+        const file = fileInput.files[0];
+        if (!file) return;
+        const formData = new FormData();
+        formData.append('sheet_file', file);
+        document.getElementById('results').innerHTML = 'Scanning...';
+        const response = await fetch('/api/simple_scan', { method: 'POST', body: formData });
+        const data = await response.json();
+        alert('SCAN RESPONSE: ' + JSON.stringify(data));
+        if (data.error) {
+            document.getElementById('results').innerHTML = '<span style="color:#c00">Error: ' + data.error + '</span>';
+            return;
+        }
+        let html = '<h2>Results</h2>';
+        if (data.results && data.results.length) {
+            data.results.forEach((res) => {
+                html += `<div style=\"margin-bottom:2em; padding:1em; border:1px solid #ccc; border-radius:8px; background:#fafbfc;\">`;
+                html += `<h3>Page ${res.page !== undefined ? res.page : ''}</h3>`;
+                if (res.debug_image_url) {
+                    html += `<div><img src=\"${res.debug_image_url}\" alt=\"Debug Image\" style=\"max-width:400px; border:1px solid #888; margin-bottom:1em;\"></div>`;
+                }
+                html += `<b>Student ID:</b> ${res.student_id || '(not detected)'}<br><br>`;
+            });
+        } else {
+            html += '<i>No results found.</i>';
+        }
+        document.getElementById('results').innerHTML = html;
+    });
+    </script>
+</body>
+</html>
+        if (cfg.answer_columns) {
+            cfg.answer_columns.forEach((col, idx) => {
+                html += `<li>Column ${idx+1}: Q${col.start_q}-${col.end_q}, Choices: ${col.choices || 5} (${col.type || 'A-E'})</li>`;
+            });
+        } else {
+            if (cfg.answers_roi_col1) html += `<li>Col 1: Q1-${cfg.col1_questions || 25}, Choices: ${cfg.col1_choices || 5} (A-E)</li>`;
+            if (cfg.answers_roi_col2_upper) html += `<li>Col 2 Upper: Q26-32, Choices: 5 (A-E)</li>`;
+            if (cfg.answers_roi_col2_lower) html += `<li>Col 2 Lower: Q33-40, Choices: 8 (A-H)</li>`;
+        }
+        html += '</ul>';
+        descDiv.innerHTML = html;
+    }
+    // Load answer keys
+    async function loadAnswerKeys() {
+        const resp = await fetch('/api/keys');
+        answerKeys = await resp.json();
+    }
+    // On test select, show region desc and load key
+    document.getElementById('test-select').addEventListener('change', function() {
+        selectedTest = this.value;
+        showAnswerRegionDesc();
+        document.getElementById('answer-key').value = answerKeys[selectedTest] || '';
+    });
+    // Show/hide answer key group
+    document.getElementById('grade-checkbox').addEventListener('change', function() {
+        document.getElementById('answer-key-group').style.display = this.checked ? 'block' : 'none';
+    });
+    // Save answer key
+    document.getElementById('save-key-btn').onclick = async function() {
+        const key = document.getElementById('answer-key').value;
+        if (!selectedTest) { document.getElementById('key-status').textContent = 'Select a test.'; return; }
+        const resp = await fetch('/api/keys', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ test_name: selectedTest, key_string: key })
+        });
+        const result = await resp.json();
+        document.getElementById('key-status').textContent = result.message || result.error || '';
+        await loadAnswerKeys();
+    };
+    // On page load, fetch configs and keys
+    window.addEventListener('DOMContentLoaded', async function() {
+        await loadTestConfigs();
+        await loadAnswerKeys();
+    });
+    // Form submit: scan and grade
+    document.getElementById('scan-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const fileInput = document.getElementById('sheet-file');
+        const file = fileInput.files[0];
+        if (!file || !selectedTest) return;
+        const formData = new FormData();
+        formData.append('sheet_file', file);
+        formData.append('test_name', selectedTest);
+        if (document.getElementById('grade-checkbox').checked) {
+            formData.append('grade', '1');
+            formData.append('answer_key', document.getElementById('answer-key').value);
+        }
+        document.getElementById('results').innerHTML = 'Scanning...';
+        const response = await fetch('/api/simple_scan', { method: 'POST', body: formData });
+        const data = await response.json();
+    console.log('[DEBUG] /api/simple_scan response:', data);
+    alert('SCAN RESPONSE: ' + JSON.stringify(data));
+        if (data.error) {
+            document.getElementById('results').innerHTML = '<span style="color:#c00">Error: ' + data.error + '</span>';
+            return;
+        }
+        // Show results for each page with image, ID, and answers table
+        let html = '<h2>Results</h2>';
+        if (data.results && data.results.length) {
+            data.results.forEach((res) => {
+                html += `<div style=\"margin-bottom:2em; padding:1em; border:1px solid #ccc; border-radius:8px; background:#fafbfc;\">`;
+                html += `<h3>Page ${res.page !== undefined ? res.page : ''}</h3>`;
+                if (res.debug_image_url) {
+                    html += `<div><img src=\"${res.debug_image_url}\" alt=\"Debug Image\" style=\"max-width:400px; border:1px solid #888; margin-bottom:1em;\"></div>`;
+                }
+                html += `<b>Student ID:</b> ${res.student_id || '(not detected)'}<br><br>`;
+                // Grading logic
+                let answerKey = null;
+                if (res.answer_key) {
+                    answerKey = {};
+                    let parts = res.answer_key.split(',');
+                    <!DOCTYPE html>
+                    <html lang="en">
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>Simple Bubble Sheet Scanner</title>
+                        <style>
+                            body { font-family: sans-serif; background: #f4f4f9; color: #222; margin: 2em; }
+                            h1 { color: #444; }
+                            form { background: #fff; padding: 2em; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); max-width: 500px; margin-bottom: 2em; }
+                            label { font-weight: bold; display: block; margin-bottom: 0.5em; }
+                            input[type=file] { margin-bottom: 1em; }
+                            button { background: #007bff; color: #fff; border: none; border-radius: 4px; padding: 0.7em 1.5em; font-size: 1em; cursor: pointer; }
+                            button:hover { background: #0056b3; }
+                            #results { background: #fff; padding: 1em; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-top: 2em; }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>Simple Bubble Sheet Scanner</h1>
+                        <form id="scan-form" enctype="multipart/form-data">
+                            <label for="sheet-file">Upload Bubble Sheet (PDF or Image):</label>
+                            <input type="file" id="sheet-file" name="sheet_file" accept=".pdf,.png,.jpg,.jpeg,image/*" required>
+                            <button type="submit">Scan Sheet</button>
+                        </form>
+                        <div id="results"></div>
+                        <script>
+                        alert('JS IS RUNNING');
+                        document.getElementById('scan-form').addEventListener('submit', async function(e) {
+                            e.preventDefault();
+                            const fileInput = document.getElementById('sheet-file');
+                            const file = fileInput.files[0];
+                            if (!file) return;
+                            const formData = new FormData();
+                            formData.append('sheet_file', file);
+                            document.getElementById('results').innerHTML = 'Scanning...';
+                            const response = await fetch('/api/simple_scan', { method: 'POST', body: formData });
+                            const data = await response.json();
+                            alert('SCAN RESPONSE: ' + JSON.stringify(data));
+                            if (data.error) {
+                                document.getElementById('results').innerHTML = '<span style="color:#c00">Error: ' + data.error + '</span>';
+                                return;
+                            }
+                            let html = '<h2>Results</h2>';
+                            if (data.results && data.results.length) {
+                                data.results.forEach((res) => {
+                                    html += `<div style=\"margin-bottom:2em; padding:1em; border:1px solid #ccc; border-radius:8px; background:#fafbfc;\">`;
+                                    html += `<h3>Page ${res.page !== undefined ? res.page : ''}</h3>`;
+                                    if (res.debug_image_url) {
+                                        html += `<div><img src=\"${res.debug_image_url}\" alt=\"Debug Image\" style=\"max-width:400px; border:1px solid #888; margin-bottom:1em;\"></div>`;
+                                    }
+                                    html += `<b>Student ID:</b> ${res.student_id || '(not detected)'}<br><br>`;
+                                });
+                            } else {
+                                html += '<i>No results found.</i>';
+                            }
+                            document.getElementById('results').innerHTML = html;
+                        });
+                        </script>
+                    </body>
+                    </html>

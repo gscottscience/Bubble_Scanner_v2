@@ -1,0 +1,68 @@
+{
+    "template_name": "Art Part B",
+    "num_questions": 30,
+    "answer_columns": [
+        {
+            "label": "Art Elements & Principles", 
+            "roi": [100, 590, 260, 830],
+            "start_q": 1,
+            "end_q": 15,
+            "choices": 4,
+            "type": "mixed"
+        },
+        {
+            "label": "Art History",
+            "roi": [660, 590, 260, 830], 
+            "start_q": 16,
+            "end_q": 30,
+            "choices": 4,
+            "type": "mixed"
+        }
+    ],
+    "question_types": {
+        "1": {"choices": 4, "type": "A-D"},
+        "2": {"choices": 4, "type": "A-D"},
+        "3": {"choices": 4, "type": "A-D"},
+        "4": {"choices": 4, "type": "A-D"},
+        "5": {"choices": 4, "type": "A-D"},
+        "6": {"choices": 4, "type": "A-D"},
+        "7": {"choices": 4, "type": "A-D"},
+        "8": {"choices": 4, "type": "A-D"},
+        "9": {"choices": 4, "type": "A-D"},
+        "10": {"choices": 4, "type": "A-D"},
+        "11": {"choices": 2, "type": "T-F"},
+        "12": {"choices": 2, "type": "T-F"},
+        "13": {"choices": 2, "type": "T-F"},
+        "14": {"choices": 2, "type": "T-F"},
+        "15": {"choices": 2, "type": "T-F"},
+        "16": {"choices": 4, "type": "A-D"},
+        "17": {"choices": 4, "type": "A-D"},
+        "18": {"choices": 4, "type": "A-D"},
+        "19": {"choices": 4, "type": "A-D"},
+        "20": {"choices": 4, "type": "A-D"},
+        "21": {"choices": 4, "type": "A-D"},
+        "22": {"choices": 4, "type": "A-D"},
+        "23": {"choices": 4, "type": "A-D"},
+        "24": {"choices": 4, "type": "A-D"},
+        "25": {"choices": 4, "type": "A-D"},
+        "26": {"choices": 2, "type": "T-F"},
+        "27": {"choices": 2, "type": "T-F"},
+        "28": {"choices": 2, "type": "T-F"},
+        "29": {"choices": 2, "type": "T-F"},
+        "30": {"choices": 2, "type": "T-F"}
+    },
+    "circle_params": {
+        "dp": 1,
+        "minDist": 25,
+        "param1": 50,
+        "param2": 15,
+        "minRadius": 5,
+        "maxRadius": 18
+    },
+    "bubble_threshold": 265,
+    "student_id_roi": [65, 175, 180, 300],
+    "student_id_threshold": 0.7,
+    "min_corner_square_area": 50,
+    "max_corner_square_area": 10000,
+    "template_id": "Art Part B"
+}

@@ -1,0 +1,2084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Bubble Sheet Scanner</title>
+    <style>body{margin:0;padding:2em;font-family:sans-serif;}#init-loader{font-size:1.2em;color:#666;}</style>
+    <style>
+    #answer-key-modal {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(0,0,0,0.4);
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+    }
+    #answer-key-modal[aria-modal="true"] {
+        display: flex !important;
+    }
+        body { font-family: sans-serif; background: #f4f4f9; color: #222; margin: 1em; }
+        h1 { color: #444; }
+        form { background: #fff; padding: 2em; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); max-width: 500px; margin-bottom: 2em; }
+        label { font-weight: bold; display: block; margin-bottom: 0.5em; }
+        input[type=file] { margin-bottom: 1em; }
+        button { background: #007bff; color: #fff; border: none; border-radius: 4px; padding: 0.7em 1.5em; font-size: 1em; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        #results { 
+            background: #fff; 
+            padding: 1em; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05); 
+            margin-top: 2em; 
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1em;
+        }
+        @media (max-width: 900px) {
+            #results {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="init-loader">Loading...</div>
+    <div id="main-content" style="display:none;">
+        <h1>Simple Bubble Sheet Scanner</h1>
+    <form id="scan-form">
+    
+    <!-- Session Configuration Modal -->
+    <div id="sessionConfigModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.4); z-index:1000; overflow-y:auto;">
+        <div style="background:#fff; border-radius:8px; box-shadow:0 2px 8px #ccc; padding:1.5em; max-width:700px; margin:2vh auto; position:relative;">
+            <h2 id="sessionConfigTitle" style="margin-top:0;">Configure Session</h2>
+            
+            <!-- Session Name -->
+            <div style="margin-bottom:1.5em;">
+                <h3 style="margin-top:0; margin-bottom:0.5em;">Session Name</h3>
+                <input type="text" id="session-modal-name" placeholder="e.g., UIL District Meet Dec 2025" style="width:100%; padding:0.6em; border:1px solid #ccc; border-radius:4px; font-size:1em; box-sizing:border-box;">
+            </div>
+            
+            <!-- School List Management -->
+            <div style="margin-bottom:1.5em;">
+                <h3 style="margin-top:0; margin-bottom:0.5em;">📚 Participating Schools</h3>
+                <p style="font-size:0.9em; color:#666; margin-bottom:0.5em;">Add schools participating in this session (simple format)</p>
+                <textarea id="sessionSchoolList" placeholder="101:Lincoln Elementary, 102:Washington Middle, 103:Jefferson High" style="width:100%; min-height:80px; font-family:monospace; font-size:0.95em; padding:0.5em; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;"></textarea>
+                <p style="font-size:0.85em; color:#999; margin-top:0.3em; font-style:italic;">Format: SchoolCode:SchoolName (comma-separated)</p>
+            </div>
+            
+            <!-- Student ID Format Info -->
+            <div style="margin-bottom:1.5em; padding:0.8em; background:#e7f3ff; border:1px solid #0084ff; border-radius:6px; box-sizing:border-box;">
+                <p style="margin:0; font-size:0.88em; color:#004085;"><strong>ℹ️ Student ID Format (5 digits):</strong> <strong>[Grade][SchoolCode][Student#]</strong> (e.g., <code>61001</code> = 6th grade, school 100, student 01)</p>
+            </div>
+            
+            <!-- Answer Keys Management -->
+            <div style="margin-bottom:1.5em; padding:0.7em; background:#fff3cd; border:1px solid #ffc107; border-radius:6px;">
+                <h3 style="margin-top:0; margin-bottom:0.5em; font-size:1.1em;">📝 Answer Key Setup</h3>
+                <p style="font-size:0.9em; color:#666; margin-bottom:0.6em;">Configure answer keys for all tests in this session (set up once)</p>
+                <button type="button" class="btn" style="background:#28a745; padding:0.6em 1.2em; font-size:0.95em;" onclick="openAnswerKeyModal();">
+                    ✏️ Manage Answer Keys
+                </button>
+                <p style="font-size:0.85em; color:#856404; margin-top:0.4em; margin-bottom:0; font-style:italic;">Click to add your answer keys. Close the window when finished.</p>
+            </div>
+            
+            <div id="sessionConfigMsg" style="margin-top:1em; font-weight:bold;"></div>
+            <div style="display:flex; gap:1em; margin-top:1.5em;">
+                <button class="btn btn-success" type="button" onclick="saveSessionConfig();">Save Session</button>
+                <button class="btn" type="button" style="background:#6c757d; color:#fff;" onclick="closeSessionConfigModal();">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Answer Key Management Modal (inside session modal) -->
+    <div id="answerKeyManagementModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.6); z-index:1100; overflow-y:auto;">
+        <div style="background:#fff; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.3); padding:2em; max-width:800px; margin:5vh auto; position:relative;">
+            <h2>Manage Answer Keys</h2>
+            <p style="color:#666; font-size:0.95em; margin-bottom:1.5em;">Session: <strong id="answerKeySessionName"></strong></p>
+            
+            <div style="margin-bottom:1.5em;">
+                <label style="font-weight:bold; display:block; margin-bottom:0.5em;">Select Test:</label>
+                <select id="answerKeyTestSelect" style="width:100%; padding:0.6em; border:1px solid #ccc; border-radius:4px; font-size:1em;">
+                    <option value="">-- Select a Test --</option>
+                </select>
+            </div>
+            
+            <div style="margin-bottom:1.5em;">
+                <label style="font-weight:bold; display:block; margin-bottom:0.5em;">Select Grade Level(s):</label>
+                <div style="display:flex; gap:1.5em; padding:0.5em 0;">
+                    <label style="cursor:pointer;"><input type="checkbox" id="answerKeyGrade6" value="6" style="margin-right:0.3em;"> 6th Grade</label>
+                    <label style="cursor:pointer;"><input type="checkbox" id="answerKeyGrade7" value="7" style="margin-right:0.3em;"> 7th Grade</label>
+                    <label style="cursor:pointer;"><input type="checkbox" id="answerKeyGrade8" value="8" style="margin-right:0.3em;"> 8th Grade</label>
+                </div>
+            </div>
+            
+            <div style="margin-bottom:1.5em;">
+                <label style="font-weight:bold; display:block; margin-bottom:0.5em;">Answer Key:</label>
+                <textarea id="answerKeyTextarea" placeholder="e.g., 1:A,2:B,3:C,4:D,5:A..." style="width:100%; min-height:120px; font-family:monospace; font-size:0.95em; padding:0.5em; border:1px solid #ccc; border-radius:4px;"></textarea>
+                <p style="font-size:0.85em; color:#666; margin-top:0.3em;">Format: QuestionNumber:Answer (comma-separated)</p>
+            </div>
+            
+            <div id="answerKeyManagementMsg" style="margin-bottom:1em; font-weight:bold;"></div>
+            
+            <div style="display:flex; gap:1em;">
+                <button class="btn btn-success" type="button" onclick="saveAnswerKeyFromModal();">Save Answer Key</button>
+                <button class="btn" type="button" style="background:#6c757d; color:#fff;" onclick="closeAnswerKeyModal();">Done</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- School List Modal (kept for backward compatibility, hidden) -->
+    <div id="schoolListModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.4); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:#fff; border-radius:8px; box-shadow:0 2px 8px #ccc; padding:2em; max-width:600px; margin:5vh auto; position:relative;">
+            <h2>Manage School List</h2>
+            <div style="margin-bottom:1em;">
+                <textarea id="schoolListTextarea" style="width:100%; min-height:180px; font-family:monospace; font-size:1em; margin-top:0.5em;"></textarea>
+            </div>
+            <div id="schoolListUpdateMsg" style="margin-top:1em; font-weight:bold;"></div>
+            <div style="display:flex; gap:1em; margin-top:1.5em;">
+                <button class="btn btn-success" type="button" onclick="saveSchoolList(); return false;">Save Changes</button>
+                <button class="btn" type="button" style="background:#007bff; color:#fff;" onclick="closeSchoolListModal(); return false;">Cancel</button>
+            </div>
+        </div>
+    </div>
+    <style>
+        .btn { background: #007bff; color: white; border: none; padding: 0.5em 1.2em; border-radius: 4px; cursor: pointer; margin-right: 0.5em; }
+        .btn-success { background: #28a745; }
+        .btn:disabled { background: #aaa; }
+    </style>
+    <script>
+        function openSchoolListModal() {
+            // Get the current session name
+            const sessionInput = document.getElementById('session-name-input');
+            const sessionSelect = document.getElementById('session-select');
+            const sessionName = sessionInput.value || sessionSelect.value;
+            
+            if (!sessionName) {
+                alert('Please select or create a session first before managing the school list.');
+                return;
+            }
+            
+            document.getElementById('schoolListModal').style.display = 'flex';
+            // Update modal title to show which session
+            const modalTitle = document.querySelector('#schoolListModal h2');
+            modalTitle.textContent = `Manage School List for: ${sessionName}`;
+            
+            // Clear first, then fetch school list for this session
+            var textarea = document.getElementById('schoolListTextarea');
+            textarea.value = '';
+            document.getElementById('schoolListUpdateMsg').textContent = '';
+            
+            fetch(`/api/school_list?session=${encodeURIComponent(sessionName)}`)
+                .then(r => {
+                    if (!r.ok) throw new Error('Failed to fetch school list');
+                    return r.json();
+                })
+                .then(data => {
+                    textarea.value = JSON.stringify(data, null, 2);
+                })
+                .catch(() => {
+                    textarea.value = '{}';
+                });
+        }
+        function closeSchoolListModal() {
+            document.getElementById('schoolListModal').style.display = 'none';
+        }
+        function saveSchoolList() {
+            const sessionInput = document.getElementById('session-name-input');
+            const sessionSelect = document.getElementById('session-select');
+            const sessionName = sessionInput.value || sessionSelect.value;
+            
+            let textarea = document.getElementById('schoolListTextarea');
+            let newList;
+            try {
+                newList = JSON.parse(textarea.value);
+            } catch (e) {
+                alert('Invalid JSON! Please check your formatting.');
+                return;
+            }
+            
+            fetch('/api/school_list', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session: sessionName, schools: newList })
+            }).then(r => r.json()).then(data => {
+                let msgDiv = document.getElementById('schoolListUpdateMsg');
+                if (!msgDiv) {
+                    msgDiv = document.createElement('div');
+                    msgDiv.id = 'schoolListUpdateMsg';
+                    msgDiv.style.marginTop = '1em';
+                    msgDiv.style.fontWeight = 'bold';
+                    document.getElementById('schoolListModal').appendChild(msgDiv);
+                }
+                if (data.status === 'success') {
+                    msgDiv.textContent = 'School List Updated!';
+                    msgDiv.style.color = '#28a745';
+                    setTimeout(() => {
+                        closeSchoolListModal();
+                    }, 1000);
+                } else {
+                    msgDiv.textContent = 'Error: ' + data.error;
+                    msgDiv.style.color = '#dc3545';
+                }
+            });
+        }
+        
+        // Session Configuration Modal Functions
+        async function openAnswerKeyModal() {
+            const sessionNameInput = document.getElementById('session-modal-name');
+            const sessionName = sessionNameInput.value.trim();
+            
+            if (!sessionName) {
+                alert('Please enter a session name first.');
+                return;
+            }
+            
+            // Show the modal
+            const modal = document.getElementById('answerKeyManagementModal');
+            document.getElementById('answerKeySessionName').textContent = sessionName;
+            modal.style.display = 'block';
+            
+            // Load test configs into the select
+            const testSelect = document.getElementById('answerKeyTestSelect');
+            try {
+                const response = await fetch('/api/test_configs');
+                const configs = await response.json();
+                
+                testSelect.innerHTML = '<option value="">-- Select a Test --</option>';
+                for (const testName in configs) {
+                    const option = document.createElement('option');
+                    option.value = testName;
+                    option.textContent = testName;
+                    testSelect.appendChild(option);
+                }
+            } catch (error) {
+                console.error('Error loading test configs:', error);
+            }
+            
+            // Add event listeners for test/grade selection
+            testSelect.onchange = loadAnswerKeyForSelection;
+            document.getElementById('answerKeyGrade6').onchange = loadAnswerKeyForSelection;
+            document.getElementById('answerKeyGrade7').onchange = loadAnswerKeyForSelection;
+            document.getElementById('answerKeyGrade8').onchange = loadAnswerKeyForSelection;
+        }
+        
+        function closeAnswerKeyModal() {
+            document.getElementById('answerKeyManagementModal').style.display = 'none';
+            document.getElementById('answerKeyTestSelect').value = '';
+            document.getElementById('answerKeyTextarea').value = '';
+            document.getElementById('answerKeyManagementMsg').textContent = '';
+            document.getElementById('answerKeyGrade6').checked = false;
+            document.getElementById('answerKeyGrade7').checked = false;
+            document.getElementById('answerKeyGrade8').checked = false;
+        }
+        
+        async function loadAnswerKeyForSelection() {
+            const testSelect = document.getElementById('answerKeyTestSelect');
+            const testName = testSelect.value;
+            if (!testName) return;
+            
+            const grade6 = document.getElementById('answerKeyGrade6').checked;
+            const grade7 = document.getElementById('answerKeyGrade7').checked;
+            const grade8 = document.getElementById('answerKeyGrade8').checked;
+            
+            if (!grade6 && !grade7 && !grade8) return;
+            
+            // Special handling for Science
+            if (testName === 'Science') {
+                document.getElementById('answerKeyGrade6').checked = true;
+                document.getElementById('answerKeyGrade7').checked = true;
+                document.getElementById('answerKeyGrade8').checked = true;
+            }
+            
+            // Determine grade suffix
+            let gradeSuffix = '';
+            if (testName === 'Science') {
+                gradeSuffix = ' - Grades 6-8';
+            } else if (grade6 && grade7 && grade8) {
+                gradeSuffix = ' - Grades 6-8';
+            } else if (grade6 && grade7) {
+                gradeSuffix = ' - Grades 6-7';
+            } else if (grade7 && grade8) {
+                gradeSuffix = ' - Grades 7-8';
+            } else if (grade6) {
+                gradeSuffix = ' - 6th Grade';
+            } else if (grade7) {
+                gradeSuffix = ' - 7th Grade';
+            } else if (grade8) {
+                gradeSuffix = ' - 8th Grade';
+            }
+            
+            const fullTestName = testName + gradeSuffix;
+            const sessionName = document.getElementById('session-modal-name').value.trim();
+            
+            try {
+                const response = await fetch(`/api/keys?session=${encodeURIComponent(sessionName)}`);
+                const keys = await response.json();
+                document.getElementById('answerKeyTextarea').value = keys[fullTestName] || '';
+            } catch (error) {
+                console.error('Error loading answer key:', error);
+            }
+        }
+        
+        async function saveAnswerKeyFromModal() {
+            const testSelect = document.getElementById('answerKeyTestSelect');
+            const testName = testSelect.value;
+            const msgDiv = document.getElementById('answerKeyManagementMsg');
+            
+            if (!testName) {
+                msgDiv.textContent = 'Please select a test.';
+                msgDiv.style.color = '#dc3545';
+                return;
+            }
+            
+            const grade6 = document.getElementById('answerKeyGrade6').checked;
+            const grade7 = document.getElementById('answerKeyGrade7').checked;
+            const grade8 = document.getElementById('answerKeyGrade8').checked;
+            
+            if (!grade6 && !grade7 && !grade8) {
+                msgDiv.textContent = 'Please select at least one grade level.';
+                msgDiv.style.color = '#dc3545';
+                return;
+            }
+            
+            // Determine grade suffix
+            let gradeSuffix = '';
+            if (testName === 'Science') {
+                gradeSuffix = ' - Grades 6-8';
+            } else if (grade6 && grade7 && grade8) {
+                gradeSuffix = ' - Grades 6-8';
+            } else if (grade6 && grade7) {
+                gradeSuffix = ' - Grades 6-7';
+            } else if (grade7 && grade8) {
+                gradeSuffix = ' - Grades 7-8';
+            } else if (grade6) {
+                gradeSuffix = ' - 6th Grade';
+            } else if (grade7) {
+                gradeSuffix = ' - 7th Grade';
+            } else if (grade8) {
+                gradeSuffix = ' - 8th Grade';
+            }
+            
+            const fullTestName = testName + gradeSuffix;
+            const keyString = document.getElementById('answerKeyTextarea').value;
+            const sessionName = document.getElementById('session-modal-name').value.trim();
+            
+            try {
+                const response = await fetch('/api/keys', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        test_name: fullTestName,
+                        key_string: keyString,
+                        session: sessionName
+                    })
+                });
+                
+                const result = await response.json();
+                if (response.ok) {
+                    msgDiv.textContent = `Answer key saved for ${fullTestName}!`;
+                    msgDiv.style.color = '#28a745';
+                } else {
+                    msgDiv.textContent = 'Error: ' + (result.error || 'Failed to save');
+                    msgDiv.style.color = '#dc3545';
+                }
+            } catch (error) {
+                msgDiv.textContent = 'Error: ' + error.message;
+                msgDiv.style.color = '#dc3545';
+            }
+        }
+        
+        function openSessionConfigModal() {
+            const sessionSelect = document.getElementById('session-select');
+            const sessionName = sessionSelect.value;
+            
+            const modal = document.getElementById('sessionConfigModal');
+            const nameInput = document.getElementById('session-modal-name');
+            const schoolTextarea = document.getElementById('sessionSchoolList');
+            const msgDiv = document.getElementById('sessionConfigMsg');
+            
+            msgDiv.textContent = '';
+            
+            if (sessionName === '__NEW__' || !sessionName) {
+                // New session
+                document.getElementById('sessionConfigTitle').textContent = 'Create New Session';
+                nameInput.value = '';
+                nameInput.readOnly = false;
+                schoolTextarea.value = '';
+                schoolTextarea.placeholder = '101:Lincoln Elementary, 102:Washington Middle, 103:Jefferson High';
+            } else {
+                // Edit existing session
+                document.getElementById('sessionConfigTitle').textContent = 'Edit Session: ' + sessionName;
+                nameInput.value = sessionName;
+                nameInput.readOnly = true;
+                
+                // Load schools for this session and convert to simple format
+                fetch(`/api/school_list?session=${encodeURIComponent(sessionName)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        // Convert JSON object to simple format
+                        const entries = [];
+                        for (const [code, name] of Object.entries(data)) {
+                            entries.push(`${code}:${name}`);
+                        }
+                        schoolTextarea.value = entries.join(', ');
+                    })
+                    .catch(() => {
+                        schoolTextarea.value = '';
+                    });
+            }
+            
+            modal.style.display = 'block';
+        }
+        
+        function closeSessionConfigModal() {
+            document.getElementById('sessionConfigModal').style.display = 'none';
+        }
+        
+        function saveSessionConfig() {
+            const nameInput = document.getElementById('session-modal-name');
+            const sessionName = nameInput.value.trim();
+            const schoolTextarea = document.getElementById('sessionSchoolList');
+            const msgDiv = document.getElementById('sessionConfigMsg');
+            
+            if (!sessionName) {
+                msgDiv.textContent = 'Please enter a session name';
+                msgDiv.style.color = '#dc3545';
+                return;
+            }
+            
+            // Parse simple format: "101:Lincoln Elementary, 102:Washington Middle"
+            let schools = {};
+            const schoolText = schoolTextarea.value.trim();
+            
+            if (schoolText) {
+                try {
+                    // Try JSON format first (backward compatibility)
+                    if (schoolText.startsWith('{')) {
+                        schools = JSON.parse(schoolText);
+                    } else {
+                        // Parse simple format
+                        const entries = schoolText.split(',');
+                        for (let entry of entries) {
+                            entry = entry.trim();
+                            if (!entry) continue;
+                            
+                            const colonIndex = entry.indexOf(':');
+                            if (colonIndex === -1) {
+                                msgDiv.textContent = 'Invalid format. Use: SchoolCode:SchoolName';
+                                msgDiv.style.color = '#dc3545';
+                                return;
+                            }
+                            
+                            const code = entry.substring(0, colonIndex).trim();
+                            const name = entry.substring(colonIndex + 1).trim();
+                            
+                            if (!code || !name) {
+                                msgDiv.textContent = 'Invalid format. Both code and name required.';
+                                msgDiv.style.color = '#dc3545';
+                                return;
+                            }
+                            
+                            schools[code] = name;
+                        }
+                    }
+                } catch (e) {
+                    msgDiv.textContent = 'Invalid school list format';
+                    msgDiv.style.color = '#dc3545';
+                    return;
+                }
+            }
+            
+            // Save schools
+            fetch('/api/school_list', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session: sessionName, schools: schools })
+            }).then(r => r.json()).then(data => {
+                if (data.status === 'success') {
+                    msgDiv.textContent = 'Session saved successfully!';
+                    msgDiv.style.color = '#28a745';
+                    
+                    // Reload sessions and select the new/updated one
+                    setTimeout(() => {
+                        closeSessionConfigModal();
+                        loadSessions().then(() => {
+                            document.getElementById('session-select').value = sessionName;
+                            updateSessionSelection();
+                        });
+                    }, 1000);
+                } else {
+                    msgDiv.textContent = 'Error: ' + data.error;
+                    msgDiv.style.color = '#dc3545';
+                }
+            });
+        }
+        
+
+    </script>
+        <label for="session-select">Session/Event Name:</label>
+        <div style="display:flex; gap:0.5em; align-items:center; margin-bottom:1em;">
+            <select id="session-select" style="flex:2;">
+                <option value="">-- Select or Create Session --</option>
+                <option value="__NEW__">➕ Create New Session</option>
+            </select>
+            <button type="button" id="edit-session-btn" class="btn" style="background:#17a2b8; padding:0.6em 1.2em; display:none;" onclick="openSessionConfigModal();">
+                ⚙️ Edit Session
+            </button>
+        </div>
+        
+        <div id="test-config-section" style="display:none;">
+            <label for="test-select">Select Test Configuration:</label>
+            <select id="test-select" name="test_name" required>
+                <option value="" disabled selected>Loading tests...</option>
+            </select>
+            <br><br>
+            <label for="grade-level-select">Select Grade Level:</label>
+            <select id="grade-level-select" required>
+                <option value="">-- Select Grade --</option>
+                <option value="6th Grade">6th Grade</option>
+                <option value="7th Grade">7th Grade</option>
+                <option value="8th Grade">8th Grade</option>
+                <option value="Grades 6-8">Grades 6-8 (All)</option>
+            </select>
+            <br><br>
+            <label for="sheet-file">Upload Bubble Sheets (PDF or Image):</label>
+            <input type="file" id="sheet-file" name="sheet_file" accept=".pdf,.png,.jpg,.jpeg,image/*" required>
+            <button type="submit" class="btn btn-success">Scan Sheets</button>
+        </div>
+    </form>
+    <div id="results" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 1em; margin-top: 1em;"></div>
+    <div style="margin-bottom:1.5em;">
+        <button id="save-to-db-btn" style="display:none; background:#17a2b8; margin-right:1em;">💾 Save to Database</button>
+        <button id="save-and-verify-btn" style="display:none; background:#28a745; margin-right:1em;">💾📋 Save & Generate Verification</button>
+        <button id="export-csv-btn" style="display:none; margin-right:1em;">Export CSV</button>
+        <button id="start-new-test-btn" style="display:none; background:#dc3545;" onclick="startNewTest()">Start New Test</button>
+    </div>
+    
+    <div style="margin-top: 3em; padding-top: 2em; border-top: 2px solid #dee2e6; text-align: center;">
+        <a href="/teacher_verification" target="_blank" style="color: #007bff; text-decoration: none; font-size: 1.1em;">📋 Teacher Verification Center</a>
+        <span style="margin: 0 1em; color: #999;">|</span>
+        <a href="/db_teacher_verification" target="_blank" style="color: #007bff; text-decoration: none; font-weight: bold; font-size: 1.1em;">📊 Database Teacher Verification Report</a>
+    </div>
+    <!-- Inline Answer Key Modal -->
+    <div id="answer-key-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.4); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:white; padding:2em; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15); min-width:320px; max-width:500px; margin:auto;">
+            <h2>Edit Answer Key</h2>
+            <div style="font-size:0.98em; color:#333; margin-bottom:0.5em; background:#f8f9fa; border:1px solid #eee; border-radius:4px; padding:0.7em;">
+                <strong>Format:</strong> <br>
+                Enter answers as <code>1:A, 2:B, 3:C</code> (comma-separated, e.g. <code>1:A,2:B,3:C</code>).<br>
+                Each entry is <code>question_number:answer_letter</code>.<br>
+                Example: <code>1:A, 2:C, 3:B, 4:D</code>
+            </div>
+            <div id="answer-key-modal-status" style="margin-bottom:0.5em; color:#c00;"></div>
+            
+            <!-- Test Name Input (shown only for new tests) -->
+            <div id="test-name-input-container" style="margin-bottom:1em; display:none;">
+                <label for="test-name-input"><strong>Test Name:</strong></label>
+                <input type="text" id="test-name-input" placeholder="Enter test name (e.g., Reading)" style="width:100%; padding:0.5em; font-size:1em; border:1px solid #ccc; border-radius:4px;">
+            </div>
+            
+            <!-- Grade Level Checkboxes -->
+            <div style="margin-bottom:1em;">
+                <label><strong>Grade Level(s):</strong></label>
+                <div style="display:flex; gap:1.5em; margin-top:0.5em; padding:0.7em; background:#f8f9fa; border:1px solid #ddd; border-radius:4px;">
+                    <label style="display:flex; align-items:center; cursor:pointer; font-weight:normal;">
+                        <input type="checkbox" id="grade-6-checkbox" value="6" style="margin-right:0.4em; cursor:pointer;">
+                        6th Grade
+                    </label>
+                    <label style="display:flex; align-items:center; cursor:pointer; font-weight:normal;">
+                        <input type="checkbox" id="grade-7-checkbox" value="7" style="margin-right:0.4em; cursor:pointer;">
+                        7th Grade
+                    </label>
+                    <label style="display:flex; align-items:center; cursor:pointer; font-weight:normal;">
+                        <input type="checkbox" id="grade-8-checkbox" value="8" style="margin-right:0.4em; cursor:pointer;">
+                        8th Grade
+                    </label>
+                </div>
+                <div id="grade-selection-hint" style="margin-top:0.3em; font-size:0.9em; color:#666; font-style:italic;"></div>
+            </div>
+            
+            <textarea id="answer-key-textarea" rows="10" style="width:100%; font-family:monospace; padding:0.5em; border:1px solid #ccc; border-radius:4px;"></textarea>
+            <div style="margin-top:1em; display:flex; gap:0.5em; flex-wrap:wrap;">
+                <button type="button" id="save-answer-key-btn" style="background:#28a745; flex:1;">Save</button>
+                <button type="button" id="save-and-add-another-btn" style="background:#17a2b8; flex:1;">Save & Add Another</button>
+                <button type="button" id="cancel-answer-key-btn" style="background:#6c757d; flex:1;">Cancel</button>
+            </div>
+        </div>
+    </div>
+    <script>
+    const exportCsvBtn = document.getElementById('export-csv-btn');
+    const saveToDbBtn = document.getElementById('save-to-db-btn');
+    const saveAndVerifyBtn = document.getElementById('save-and-verify-btn');
+    const startNewTestBtn = document.getElementById('start-new-test-btn');
+    
+    // Store scan results globally so they can be accessed by verification button
+    let lastScanData = null;
+    
+    // Safe split helper to avoid calling .split on undefined
+    function safeSplit(str, sep = ',') {
+        if (!str || typeof str !== 'string') return [];
+        return str.split(sep);
+    }
+    // --- Answer Key Modal Logic ---
+    const answerKeyModal = document.getElementById('answer-key-modal');
+    const answerKeyTextarea = document.getElementById('answer-key-textarea');
+    const saveAnswerKeyBtn = document.getElementById('save-answer-key-btn');
+    const saveAndAddAnotherBtn = document.getElementById('save-and-add-another-btn');
+    const cancelAnswerKeyBtn = document.getElementById('cancel-answer-key-btn');
+    const answerKeyModalStatus = document.getElementById('answer-key-modal-status');
+    const grade6Checkbox = document.getElementById('grade-6-checkbox');
+    const grade7Checkbox = document.getElementById('grade-7-checkbox');
+    const grade8Checkbox = document.getElementById('grade-8-checkbox');
+    const gradeSelectionHint = document.getElementById('grade-selection-hint');
+    const testSelect = document.getElementById('test-select');
+    const testNameInput = document.getElementById('test-name-input');
+    const testNameInputContainer = document.getElementById('test-name-input-container');
+    
+    // Handle session selection changes
+    function updateSessionSelection() {
+        const sessionSelect = document.getElementById('session-select');
+        const editSessionBtn = document.getElementById('edit-session-btn');
+        const testConfigSection = document.getElementById('test-config-section');
+        const sessionValue = sessionSelect.value;
+        
+        if (sessionValue === '__NEW__') {
+            // User wants to create a new session - open modal
+            openSessionConfigModal();
+            sessionSelect.value = ''; // Reset to default
+            editSessionBtn.style.display = 'none';
+            testConfigSection.style.display = 'none';
+        } else if (sessionValue && sessionValue !== '') {
+            // Existing session selected
+            editSessionBtn.style.display = 'inline-block';
+            testConfigSection.style.display = 'block';
+        } else {
+            // No session selected
+            editSessionBtn.style.display = 'none';
+            testConfigSection.style.display = 'none';
+        }
+    }
+    
+    // Helper function to get selected grades as array
+    function getSelectedGrades() {
+        const grades = [];
+        if (grade6Checkbox.checked) grades.push(6);
+        if (grade7Checkbox.checked) grades.push(7);
+        if (grade8Checkbox.checked) grades.push(8);
+        return grades;
+    }
+    
+    // Helper function to determine grade suffix based on selected grades
+    function getGradeSuffix(grades) {
+        if (grades.length === 0) return null;
+        
+        if (grades.length === 3) {
+            // All three grades: 6, 7, 8
+            return ' - Grades 6-8';
+        } else if (grades.length === 1 && grades[0] === 6) {
+            // Only 6th grade
+            return ' - 6th Grade';
+        } else if (grades.includes(7) || grades.includes(8)) {
+            // Any combination with 7 or 8 (but not all 3)
+            return ' - 7th & 8th Grades';
+        }
+        return null;
+    }
+    
+    // Update hint text when checkboxes change
+    function updateGradeHint() {
+        const grades = getSelectedGrades();
+        const suffix = getGradeSuffix(grades);
+        
+        if (!suffix) {
+            gradeSelectionHint.textContent = 'Select at least one grade level';
+            gradeSelectionHint.style.color = '#c00';
+        } else {
+            gradeSelectionHint.textContent = `Will save as: "${suffix.replace(' - ', '')}"`;
+            gradeSelectionHint.style.color = '#28a745';
+        }
+    }
+    
+    grade6Checkbox.addEventListener('change', updateGradeHint);
+    grade7Checkbox.addEventListener('change', updateGradeHint);
+    grade8Checkbox.addEventListener('change', updateGradeHint);
+    
+    // Also update when grade checkbox changes - reload answer key
+    grade6Checkbox.addEventListener('change', loadAnswerKeyForGrade);
+    grade7Checkbox.addEventListener('change', loadAnswerKeyForGrade);
+    grade8Checkbox.addEventListener('change', loadAnswerKeyForGrade);
+
+    // Load existing sessions on page load
+    async function loadSessions() {
+        try {
+            const response = await fetch('/api/get_sessions');
+            if (!response.ok) {
+                console.error('Failed to load sessions');
+                return;
+            }
+            const sessions = await response.json();
+            console.log('Loaded sessions:', sessions);
+            
+            const sessionSelect = document.getElementById('session-select');
+            // Clear existing options
+            sessionSelect.innerHTML = '<option value="">-- Select or Create Session --</option>';
+            sessionSelect.innerHTML += '<option value="__NEW__">➕ Create New Session</option>';
+            
+            if (sessions.length > 0) {
+                // Add separator
+                const separator = document.createElement('option');
+                separator.disabled = true;
+                separator.textContent = '─────────────────';
+                sessionSelect.appendChild(separator);
+                
+                // Add existing sessions
+                sessions.forEach(session => {
+                    const option = document.createElement('option');
+                    option.value = session;
+                    option.textContent = session;
+                    sessionSelect.appendChild(option);
+                });
+            }
+            
+            // Remove old event listeners and add new one
+            const newSessionSelect = sessionSelect.cloneNode(true);
+            sessionSelect.parentNode.replaceChild(newSessionSelect, sessionSelect);
+            
+            // Handle session selection
+            newSessionSelect.addEventListener('change', updateSessionSelection);
+        } catch (error) {
+            console.error('Error loading sessions:', error);
+        }
+    }
+
+    // Load test configurations on page load
+    async function loadTestConfigs() {
+        try {
+            console.log('Loading test configs...');
+            const response = await fetch('/api/test_configs');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const configs = await response.json();
+            console.log('Received configs:', configs);
+            
+            // Clear existing options
+            testSelect.innerHTML = '<option value="" disabled selected>--Select Test--</option>';
+            
+            // Add "Add New Test" option at the top
+            const addNewOption = document.createElement('option');
+            addNewOption.value = '__ADD_NEW__';
+            addNewOption.textContent = '➕ Add New Test';
+            addNewOption.style.fontWeight = 'bold';
+            addNewOption.style.color = '#007bff';
+            testSelect.appendChild(addNewOption);
+            
+            // Add separator
+            const separator = document.createElement('option');
+            separator.disabled = true;
+            separator.textContent = '─────────────────';
+            testSelect.appendChild(separator);
+            
+            // Get unique base test names (without grade suffixes)
+            const baseTests = new Set();
+            Object.keys(configs).forEach(testName => {
+                // Remove grade suffixes to get base name - matches teacher_verification.html logic
+                let baseName = testName
+                    .replace(/ - \d+(st|nd|rd|th) Grade$/i, '')
+                    .replace(/ - \d+(st|nd|rd|th) & \d+(st|nd|rd|th) Grades$/i, '')
+                    .replace(/ - Grades \d+-\d+$/i, '')
+                    .replace(/ \d+(st|nd|rd|th)$/i, '')
+                    .trim();
+                baseTests.add(baseName);
+            });
+            
+            console.log('Base tests:', Array.from(baseTests));
+            
+            // Add options for each unique base test
+            Array.from(baseTests).sort().forEach(testName => {
+                const option = document.createElement('option');
+                option.value = testName;
+                option.textContent = testName;
+                testSelect.appendChild(option);
+            });
+            
+            console.log('Test configs loaded successfully');
+        } catch (error) {
+            console.error('Error loading test configs:', error);
+            testSelect.innerHTML = '<option value="" disabled selected>Error loading tests</option>';
+        }
+    }
+
+    // Load test configs and sessions when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadTestConfigs();
+        loadSessions();
+    });
+    
+    // Helper function to load answer key based on selected grade
+    async function loadAnswerKeyForGrade() {
+        let testName = testSelect.value;
+        const grades = getSelectedGrades();
+        const gradeSuffix = getGradeSuffix(grades);
+        
+        // If "Add New Test" is selected, use the custom input name
+        if (testName === '__ADD_NEW__') {
+            testName = testNameInput.value.trim();
+            if (!testName) {
+                answerKeyTextarea.value = '';
+                answerKeyModalStatus.style.color = '#856404';
+                answerKeyModalStatus.textContent = 'Enter a test name above to continue.';
+                return;
+            }
+        }
+        
+        if (!testName || !gradeSuffix) {
+            answerKeyTextarea.value = '';
+            return;
+        }
+        
+        // Build the full test name with grade suffix
+        const fullTestName = testName + gradeSuffix;
+        
+        const sessionSelect = document.getElementById('session-select');
+        const currentSession = sessionSelect.value;
+        
+        try {
+            const keysResponse = await fetch(`/api/keys?session=${encodeURIComponent(currentSession)}`);
+            const storedKeys = await keysResponse.json();
+            console.log('DEBUG: Loading answer key for:', fullTestName);
+            answerKeyTextarea.value = storedKeys[fullTestName] || '';
+            
+            if (!storedKeys[fullTestName]) {
+                answerKeyModalStatus.style.color = '#856404';
+                // Special message for Science
+                if (testName === 'Science') {
+                    answerKeyModalStatus.textContent = 'No answer key found for Science - Grades 6-8. Science uses one answer key for all grades. Enter it below.';
+                } else {
+                    answerKeyModalStatus.textContent = `No answer key found for ${fullTestName}. Enter new key below.`;
+                }
+            } else {
+                // Keep helpful info message for all tests when key exists
+                if (testName === 'Science') {
+                    answerKeyModalStatus.style.color = '#0056b3';
+                    answerKeyModalStatus.textContent = 'Science uses one answer key for all grades (6-8).';
+                } else {
+                    answerKeyModalStatus.style.color = '#0056b3';
+                    answerKeyModalStatus.textContent = 'Check all grades that apply for this answer key. You can add multiple grade-specific answer keys using "Save & Add Another".';
+                }
+            }
+        } catch (error) {
+            console.error('Error loading answer key:', error);
+            answerKeyTextarea.value = '';
+        }
+    }
+    
+    cancelAnswerKeyBtn.onclick = function() {
+        answerKeyModal.removeAttribute('aria-modal');
+    };
+    
+    // Save answer key function
+    async function saveAnswerKey(closeModal = true) {
+        let testName = testSelect.value;
+        const grades = getSelectedGrades();
+        const gradeSuffix = getGradeSuffix(grades);
+        const keyString = answerKeyTextarea.value;
+        answerKeyModalStatus.textContent = '';
+        
+        // If "Add New Test" is selected, use the custom input name
+        if (testName === '__ADD_NEW__') {
+            testName = testNameInput.value.trim();
+            if (!testName) {
+                answerKeyModalStatus.style.color = '#c00';
+                answerKeyModalStatus.textContent = 'Please enter a test name.';
+                testNameInput.focus();
+                return false;
+            }
+        }
+        
+        if (!testName) {
+            answerKeyModalStatus.textContent = 'No test selected.';
+            return false;
+        }
+        
+        if (!gradeSuffix) {
+            answerKeyModalStatus.style.color = '#c00';
+            answerKeyModalStatus.textContent = 'Please select at least one grade level.';
+            return false;
+        }
+        
+        // Build the full test name with grade suffix
+        const fullTestName = testName + gradeSuffix;
+        
+        const sessionSelect = document.getElementById('session-select');
+        const currentSession = sessionSelect.value;
+        
+        try {
+            const resp = await fetch('/api/keys', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    test_name: fullTestName, 
+                    key_string: keyString,
+                    session: currentSession
+                })
+            });
+            const result = await resp.json();
+            if (resp.ok) {
+                answerKeyModalStatus.style.color = '#28a745';
+                answerKeyModalStatus.textContent = `Answer key saved for ${fullTestName}!`;
+                if (closeModal) {
+                    setTimeout(() => { answerKeyModal.removeAttribute('aria-modal'); }, 800);
+                }
+                return true;
+            } else {
+                answerKeyModalStatus.style.color = '#c00';
+                answerKeyModalStatus.textContent = result.error || 'Error saving key.';
+                return false;
+            }
+        } catch (err) {
+            answerKeyModalStatus.style.color = '#c00';
+            answerKeyModalStatus.textContent = 'Network error.';
+            return false;
+        }
+    }
+    
+    saveAnswerKeyBtn.onclick = async function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        await saveAnswerKey(true);
+    };
+    
+    saveAndAddAnotherBtn.onclick = async function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const saved = await saveAnswerKey(false);
+        if (saved) {
+            // Clear the textarea
+            answerKeyTextarea.value = '';
+            
+            // Cycle through grade combinations:
+            // 6 only -> 7&8 (both checked) -> all three -> back to 6
+            if (grade6Checkbox.checked && !grade7Checkbox.checked && !grade8Checkbox.checked) {
+                // Was 6th only, switch to 7th & 8th
+                grade6Checkbox.checked = false;
+                grade7Checkbox.checked = true;
+                grade8Checkbox.checked = true;
+            } else if (!grade6Checkbox.checked && grade7Checkbox.checked && grade8Checkbox.checked) {
+                // Was 7th & 8th, switch to all three (6-8)
+                grade6Checkbox.checked = true;
+                grade7Checkbox.checked = true;
+                grade8Checkbox.checked = true;
+            } else {
+                // Any other combination, go back to 6th only
+                grade6Checkbox.checked = true;
+                grade7Checkbox.checked = false;
+                grade8Checkbox.checked = false;
+            }
+            
+            updateGradeHint();
+            
+            // Load answer key for new grade combination
+            await loadAnswerKeyForGrade();
+        }
+    };
+
+    // Function to update student ID in the stored data and automatically re-grade
+    async function updateStudentId(idx, newId) {
+        if (lastScanData && lastScanData.results && lastScanData.results[idx]) {
+            lastScanData.results[idx].student_id = newId;
+            lastScanData.results[idx].studentId = newId;  // Update both formats
+            console.log(`Updated Student ID for index ${idx} to: ${newId}`);
+            
+            // Automatically trigger re-grading with new grade-specific answer key
+            await rescanSheet(idx);
+        }
+    }
+
+    // Function to rescan a specific sheet with updated grade-based answer key
+    async function rescanSheet(idx) {
+        if (!lastScanData || !lastScanData.results || !lastScanData.results[idx]) {
+            alert('No scan data available for this sheet');
+            return;
+        }
+        
+        const result = lastScanData.results[idx];
+        const studentId = document.getElementById(`student-id-${idx}`).value;
+        const testName = testSelect.value;
+        
+        if (!studentId || studentId.length < 1) {
+            alert('Please enter a valid Student ID before rescanning');
+            return;
+        }
+        
+        // Update the student ID in the data
+        result.student_id = studentId;
+        result.studentId = studentId;
+        
+        // Extract grade from first digit of student ID
+        const grade = studentId[0];
+        let gradeLevel;
+        
+        // Map grade digit to grade level text
+        if (grade === '6') {
+            gradeLevel = '6th Grade';
+        } else if (grade === '7') {
+            gradeLevel = '7th Grade';
+        } else if (grade === '8') {
+            gradeLevel = '8th Grade';
+        } else {
+            gradeLevel = 'Grades 6-8';
+        }
+        
+        console.log(`Rescanning for student ${studentId} (Grade ${grade}) with test: ${testName}`);
+        
+        const sessionSelect = document.getElementById('session-select');
+        const currentSession = sessionSelect.value;
+        
+        try {
+            // Reload answer keys for the session
+            const response = await fetch(`/api/keys?session=${encodeURIComponent(currentSession)}`);
+            const keys = await response.json();
+            
+            // Build possible answer key names with fallback patterns (same logic as initial scan)
+            const possibleKeyNames = [];
+            possibleKeyNames.push(`${testName} - ${gradeLevel}`);
+            
+            if (gradeLevel === '7th Grade' || gradeLevel === '8th Grade') {
+                possibleKeyNames.push(`${testName} - 7th & 8th Grades`);
+            }
+            
+            if (testName === 'Science' || testName === 'Mathematics' || testName === 'Chess Puzzle') {
+                possibleKeyNames.push(`${testName} - Grades 6-8`);
+            }
+            
+            possibleKeyNames.push(`${testName} - Grades 6-8`);
+            
+            console.log('Looking for answer key:', possibleKeyNames);
+            
+            // Try to find matching answer key
+            let newAnswerKey = null;
+            let foundKeyName = null;
+            for (const keyName of possibleKeyNames) {
+                if (keys[keyName]) {
+                    newAnswerKey = keys[keyName];
+                    foundKeyName = keyName;
+                    break;
+                }
+            }
+            
+            if (newAnswerKey) {
+                console.log(`✓ Found answer key: ${foundKeyName}`);
+                result.answer_key = newAnswerKey;
+                result.answerKey = parseAnswerKeyString(newAnswerKey);
+                result.testName = foundKeyName;
+                
+                // Re-grade the answers in place
+                const keyMap = parseAnswerKeyString(newAnswerKey);
+                const tiebreakerQs = result.tiebreaker_questions || [];
+                const mainTable = document.querySelector(`#answers-table-${idx}`);
+                const tiebreakerTable = document.querySelector(`#tiebreaker-table-${idx}`);
+                
+                // Function to regrade a table
+                function regradeTable(table, isMainTable = true) {
+                    if (!table) return 0;
+                    const inputs = table.querySelectorAll('input[type="text"]');
+                    let correctCount = 0;
+                    
+                    // Remove old event listeners by cloning and replacing
+                    inputs.forEach(input => {
+                        const newInput = input.cloneNode(true);
+                        input.parentNode.replaceChild(newInput, input);
+                    });
+                    
+                    // Get the new inputs after replacement
+                    const newInputs = table.querySelectorAll('input[type="text"]');
+                    
+                    // Re-grade and attach new event listeners
+                    newInputs.forEach(input => {
+                        const q = parseInt(input.getAttribute('data-q'));
+                        const val = input.value.trim();
+                        const cell = input.parentElement;
+                        const correctAnswer = keyMap[q];
+                        
+                        const isBlank = !val || val === '' || val === '--' || val === '—' || val.trim() === '--';
+                        
+                        // Set initial colors
+                        if (!isBlank && correctAnswer && val.toUpperCase() === correctAnswer) {
+                            cell.style.background = '#c8f7c5';
+                            correctCount++;
+                        } else if (!isBlank && val && correctAnswer) {
+                            cell.style.background = '#ffd6d6';
+                        } else {
+                            cell.style.background = '';
+                            cell.style.backgroundColor = '';
+                        }
+                        
+                        // Attach new event listener with updated keyMap
+                        input.addEventListener('input', function() {
+                            const q = parseInt(this.getAttribute('data-q'));
+                            const correct = keyMap[q];
+                            const val = this.value.trim();
+                            const cell = this.parentElement;
+                            const isBlank = !val || val === '' || val === '--' || val === '—' || val.trim() === '--';
+                            
+                            if (!isBlank && val && correct) {
+                                if (val.toUpperCase() === correct) {
+                                    cell.style.background = '#c8f7c5';
+                                } else {
+                                    cell.style.background = '#ffd6d6';
+                                }
+                            } else {
+                                cell.style.background = '';
+                                cell.style.backgroundColor = '';
+                            }
+                            
+                            // Update score summary with tiebreaker logic
+                            let mainCorrect = 0;
+                            let tiebreakerCorrect = 0;
+                            
+                            if (mainTable) {
+                                const mainInputs = mainTable.querySelectorAll('input[type="text"]');
+                                mainInputs.forEach(inp => {
+                                    const q2 = parseInt(inp.getAttribute('data-q'));
+                                    const v2 = inp.value.trim();
+                                    const isBlank2 = !v2 || v2 === '' || v2 === '--' || v2 === '—' || v2.trim() === '--';
+                                    if (keyMap[q2] && !isBlank2 && v2.toUpperCase() === keyMap[q2]) mainCorrect++;
+                                });
+                            }
+                            
+                            if (tiebreakerTable) {
+                                const tbInputs = tiebreakerTable.querySelectorAll('input[type="text"]');
+                                tbInputs.forEach(inp => {
+                                    const q2 = parseInt(inp.getAttribute('data-q'));
+                                    const v2 = inp.value.trim();
+                                    const isBlank2 = !v2 || v2 === '' || v2 === '--' || v2 === '—' || v2.trim() === '--';
+                                    if (keyMap[q2] && !isBlank2 && v2.toUpperCase() === keyMap[q2]) tiebreakerCorrect++;
+                                });
+                            }
+                            
+                            const scoreDiv = document.getElementById(`score-summary-${idx}`);
+                            if (scoreDiv) {
+                                if (tiebreakerTable) {
+                                    let mainTotal = mainTable ? mainTable.querySelectorAll('input[type="text"]').length : 0;
+                                    let tbTotal = tiebreakerTable.querySelectorAll('input[type="text"]').length;
+                                    let tiebreakerDecimal = tiebreakerCorrect / 100;
+                                    let finalScore = (mainCorrect + tiebreakerDecimal).toFixed(2);
+                                    scoreDiv.textContent = `Score: ${finalScore} (${mainCorrect}/${mainTotal} + ${tiebreakerCorrect}/${tbTotal} TB)`;
+                                } else {
+                                    let mainTotal = mainTable ? mainTable.querySelectorAll('input[type="text"]').length : 0;
+                                    scoreDiv.textContent = `Score: ${mainCorrect}/${mainTotal}`;
+                                }
+                            }
+                        });
+                    });
+                    
+                    return correctCount;
+                }
+                
+                // Regrade both tables
+                const mainCorrect = regradeTable(mainTable, true);
+                const tiebreakerCorrect = regradeTable(tiebreakerTable, false);
+                
+                // Update score display
+                const scoreDiv = document.getElementById(`score-summary-${idx}`);
+                if (scoreDiv) {
+                    if (tiebreakerTable) {
+                        let mainTotal = mainTable ? mainTable.querySelectorAll('input[type="text"]').length : 0;
+                        let tbTotal = tiebreakerTable.querySelectorAll('input[type="text"]').length;
+                        let tiebreakerDecimal = tiebreakerCorrect / 100;
+                        let finalScore = (mainCorrect + tiebreakerDecimal).toFixed(2);
+                        scoreDiv.textContent = `Score: ${finalScore} (${mainCorrect}/${mainTotal} + ${tiebreakerCorrect}/${tbTotal} TB)`;
+                    } else {
+                        let mainTotal = mainTable ? mainTable.querySelectorAll('input[type="text"]').length : 0;
+                        scoreDiv.textContent = `Score: ${mainCorrect}/${mainTotal}`;
+                    }
+                }
+                
+                console.log(`Re-graded with ${foundKeyName} answer key`);
+            } else {
+                console.warn(`⚠ No answer key found. Tried: ${possibleKeyNames.join(', ')}`);
+                alert(`Answer key not found for ${testName} - ${gradeLevel}.\nTried: ${possibleKeyNames.join(', ')}`);
+            }
+        } catch (error) {
+            console.error('Error loading answer keys:', error);
+            alert('Error loading answer keys');
+        }
+    }
+
+    // Helper to parse answer key string
+    function parseAnswerKeyString(keyStr) {
+        const keyMap = {};
+        if (!keyStr) return keyMap;
+        keyStr.split(',').forEach(pair => {
+            const parts = pair.trim().split(':');
+            if (parts.length === 2) {
+                keyMap[parseInt(parts[0])] = parts[1].trim();
+            }
+        });
+        return keyMap;
+    }
+
+    // --- Scan Form Logic ---
+    // gradeCheckbox already declared above
+    document.getElementById('scan-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const fileInput = document.getElementById('sheet-file');
+        const file = fileInput.files[0];
+        const templateName = testSelect.value;
+        if (!file || !templateName) return;
+        const formData = new FormData();
+        formData.append('sheet_file', file);
+        formData.append('template_name', templateName);
+        document.getElementById('results').innerHTML = `
+        <div id="scanning-indicator" style="margin: 1em 0; display: flex; align-items: center; justify-content: center;">
+            <div id="spinner" style="display: block;">
+                <div class="loader"></div>
+                <div style="font-size:1em; margin-top:0.5em;">Scanning...</div>
+            </div>
+        </div>
+        <style>
+            .loader {
+                border: 6px solid #f3f3f3;
+                border-top: 6px solid #007bff;
+                border-radius: 50%;
+                width: 36px;
+                height: 36px;
+                animation: spin 1s linear infinite;
+                margin: 0 auto;
+            }
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        </style>
+        `;
+
+        let data;
+        let timeoutId;
+        try {
+            // Add a timeout for the fetch (e.g., 5 minutes)
+            const controller = new AbortController();
+            timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+            const response = await fetch('/api/simple_scan', { method: 'POST', body: formData, signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            data = await response.json();
+            if (data.error) {
+                document.getElementById('results').innerHTML = '<span style="color:#c00">Error: ' + data.error + '</span>';
+                return;
+            }
+        } catch (error) {
+            clearTimeout(timeoutId);
+            let msg = error.message || error;
+            if (msg.includes('AbortError')) {
+                msg = 'Scan timed out. The file may be too large or the server is busy.';
+            }
+            console.error('Scan request failed:', error);
+            document.getElementById('results').innerHTML = '<span style="color:#c00">Error: ' + msg + '</span>';
+            return;
+        }
+        let html = '';
+        try {
+            // Store data globally for verification report
+            lastScanData = data;
+            
+            // Apply grade-specific answer key based on selected grade level
+            if (data.results && data.results.length) {
+                const testName = testSelect.value;
+                const selectedGrade = document.getElementById('grade-level-select').value;
+                
+                const sessionSelect = document.getElementById('session-select');
+                const currentSession = sessionSelect.value;
+                
+                // Load all answer keys for this session
+                const keysResponse = await fetch(`/api/keys?session=${encodeURIComponent(currentSession)}`);
+                const allKeys = await keysResponse.json();
+                
+                // Build possible answer key names with fallback patterns
+                const possibleKeyNames = [];
+                
+                // Try exact match first: "TestName - SelectedGrade"
+                possibleKeyNames.push(`${testName} - ${selectedGrade}`);
+                
+                // Add fallback patterns based on selected grade
+                if (selectedGrade === '7th Grade' || selectedGrade === '8th Grade') {
+                    // Also try "7th & 8th Grades" format
+                    possibleKeyNames.push(`${testName} - 7th & 8th Grades`);
+                }
+                
+                // Special handling for Science, Math, and Chess - often use "Grades 6-8" for all
+                if (testName === 'Science' || testName === 'Mathematics' || testName === 'Chess Puzzle') {
+                    possibleKeyNames.push(`${testName} - Grades 6-8`);
+                }
+                
+                // Always try "Grades 6-8" as last fallback for any test
+                possibleKeyNames.push(`${testName} - Grades 6-8`);
+                
+                console.log('Looking for answer key with these names:', possibleKeyNames);
+                console.log('Available keys:', Object.keys(allKeys));
+                
+                // Try to find matching answer key
+                let foundKey = null;
+                let foundKeyName = null;
+                for (const keyName of possibleKeyNames) {
+                    if (allKeys[keyName]) {
+                        foundKey = allKeys[keyName];
+                        foundKeyName = keyName;
+                        break;
+                    }
+                }
+                
+                // Apply the answer key to all results
+                if (foundKey) {
+                    data.results.forEach(res => {
+                        res.answer_key = foundKey;
+                        res.answerKey = parseAnswerKeyString(foundKey);
+                        res.testName = foundKeyName;
+                    });
+                    console.log(`✓ Applied answer key: ${foundKeyName}`);
+                } else {
+                    console.warn(`⚠ No answer key found. Tried: ${possibleKeyNames.join(', ')}`);
+                    alert(`Warning: No answer key found for ${testName} - ${selectedGrade}.\nResults will not be graded.`);
+                }
+            }
+            
+            if (data.results && data.results.length) {
+                const sheetCount = data.results.length;
+                html += `<h2 style="grid-column: 1 / -1; margin-bottom: 0.5em;">Results (${sheetCount} sheet${sheetCount !== 1 ? 's' : ''} scanned)</h2>`;
+                saveToDbBtn.style.display = 'inline-block';
+                saveToDbBtn.disabled = false;
+                saveToDbBtn.textContent = '💾 Save to Database';
+                saveToDbBtn.style.background = '#17a2b8';
+                saveAndVerifyBtn.style.display = 'inline-block';
+                exportCsvBtn.style.display = 'inline-block';
+                startNewTestBtn.style.display = 'inline-block';
+            } else {
+                html += '<h2 style="grid-column: 1 / -1;">Results</h2>';
+                saveToDbBtn.style.display = 'none';
+                saveAndVerifyBtn.style.display = 'none';
+                exportCsvBtn.style.display = 'none';
+                startNewTestBtn.style.display = 'none';
+                html += '<div style="color:#c00; font-weight:bold; grid-column: 1 / -1;">No results found. The scan may have failed or no sheets were detected.</div>';
+            }
+
+        // --- Results Rendering ---
+        data.results.forEach((res, idx) => {
+            // Check if this result has an answer key for grading
+            const doGrade = res.answer_key && res.answer_key.length > 0;
+            html += `<div style="margin-bottom:2em; padding:1em; border:1px solid #ccc; border-radius:8px; background:#fafbfc;">`;
+            html += `<h3 style="display:flex; align-items:center; gap:0.5em;">
+                <span>Student ID:</span>
+                <input type="text" id="student-id-${idx}" value="${res.student_id || ''}" placeholder="Enter ID" style="font-size:1em; padding:0.3em; border:1px solid #ccc; border-radius:4px; width:150px;" onchange="updateStudentId(${idx}, this.value)">
+            </h3>`;
+            if (res.debug_image_url) {
+                html += `<div style="margin-top:24px;"><img id="img-${res.page}" src="${res.debug_image_url}" alt="Debug Image" style="width:100%; max-width:100%; border:1px solid #888; margin-bottom:1em;"></div>`;
+            }
+            
+            // Parse answer key for highlighting
+            let keyMap = {};
+            if (res.answer_key && typeof res.answer_key === 'string') {
+                safeSplit(res.answer_key).forEach(pair => {
+                    if (pair && pair.trim()) {
+                        const parts = pair.split(':');
+                        const q = parts[0];
+                        const a = parts.slice(1).join(':');
+                        if (q && a) keyMap[parseInt(q.trim())] = a.trim().toUpperCase();
+                    }
+                });
+            }
+            
+            // Separate main and tiebreaker questions
+            const tiebreakerQs = res.tiebreaker_questions || [];
+            const mainAnswers = [];
+            const tiebreakerAnswers = [];
+            
+            if (res.answers && res.answers.length) {
+                res.answers.forEach(ans => {
+                    if (tiebreakerQs.includes(ans.question)) {
+                        tiebreakerAnswers.push(ans);
+                    } else {
+                        mainAnswers.push(ans);
+                    }
+                });
+            }
+            
+            // Function to render answer cells
+            function renderAnswerCells(answers, labelPrefix = '') {
+                let correctCount = 0;
+                let cells = [];
+                answers.forEach((ans, aidx) => {
+                    let correct = keyMap[ans.question];
+                    let displayAnswer = (ans.answer || '').toString().replace(/\s+/g, '');
+                    const isBlank = !displayAnswer || displayAnswer === '' || displayAnswer === '--' || displayAnswer === '—' || displayAnswer.trim() === '' || displayAnswer.trim() === '--';
+                    let isCorrect = doGrade && correct && !isBlank && displayAnswer.toUpperCase() === correct;
+                    if (isCorrect) correctCount++;
+                    let cellStyle = '';
+                    if (doGrade) {
+                        if (!isBlank) {
+                            cellStyle = isCorrect ? 'background:#c8f7c5;' : (correct ? 'background:#ffd6d6;' : '');
+                        } else {
+                            cellStyle = '';
+                        }
+                    }
+                    let widthStyle = 'min-width:4.5em; max-width:4.5em; white-space:nowrap;';
+                    let displayLabel = labelPrefix ? labelPrefix + (aidx + 1) : ans.question;
+                    cells.push(`<td style='padding:2px 2px; ${widthStyle} border:1px solid #ccc; text-align:center;${cellStyle}'><span style='font-size:0.98em;'>${displayLabel}:</span> <input type='text' value='${displayAnswer}' data-q='${ans.question}' style='width:2.5em; text-align:center; border:none; background:transparent; outline:none; font-size:1em; white-space:nowrap;'></td>`);
+                });
+                return {cells, correctCount};
+            }
+            
+            // Render main questions
+            html += `<div style='font-weight:bold; margin-top:1em; margin-bottom:0.5em;'>Student Responses</div>`;
+            html += `<div style="overflow-x:auto;"><table id="answers-table-${idx}" style="border-collapse:collapse; background:#fff; width:auto;">`;
+            
+            if (mainAnswers.length > 0) {
+                const mainResult = renderAnswerCells(mainAnswers);
+                for (let i = 0; i < mainResult.cells.length; i += 5) {
+                    html += '<tr>' + mainResult.cells.slice(i, i+5).join('') + '</tr>';
+                }
+                var mainCorrect = mainResult.correctCount;
+            } else {
+                html += `<tr><td colspan='5' style='text-align:center; color:#888;'>No answers detected</td></tr>`;
+                var mainCorrect = 0;
+            }
+            html += `</table></div>`;
+            
+            // Render tiebreaker questions if present
+            var tiebreakerCorrect = 0;
+            if (tiebreakerAnswers.length > 0) {
+                html += `<div style='font-weight:bold; margin-top:1em; margin-bottom:0.5em;'>Tiebreaker</div>`;
+                html += `<div style="overflow-x:auto;"><table id="tiebreaker-table-${idx}" style="border-collapse:collapse; background:#fff; width:auto;">`;
+                const tbResult = renderAnswerCells(tiebreakerAnswers, 'TB ');
+                for (let i = 0; i < tbResult.cells.length; i += 5) {
+                    html += '<tr>' + tbResult.cells.slice(i, i+5).join('') + '</tr>';
+                }
+                html += `</table></div>`;
+                tiebreakerCorrect = tbResult.correctCount;
+            }
+            
+            // Score summary with decimal tiebreaker
+            if (doGrade) {
+                let finalScore = mainCorrect;
+                if (tiebreakerAnswers.length > 0) {
+                    // Add tiebreaker as decimals (e.g., 3 correct out of 8 = .03)
+                    let tiebreakerDecimal = tiebreakerCorrect / 100;
+                    finalScore = (mainCorrect + tiebreakerDecimal).toFixed(2);
+                    html += `<div id="score-summary-${idx}" style="margin-top:0.7em; font-weight:bold;">Score: ${finalScore} (${mainCorrect}/${mainAnswers.length} + ${tiebreakerCorrect}/${tiebreakerAnswers.length} TB)</div>`;
+                } else {
+                    html += `<div id="score-summary-${idx}" style="margin-top:0.7em; font-weight:bold;">Score: ${mainCorrect}/${mainAnswers.length}</div>`;
+                }
+            }
+            html += `</div>`;
+        });
+        document.getElementById('results').innerHTML = html;
+
+        // Helper function to re-enable save buttons after edits
+        function enableSaveButtons() {
+            if (saveToDbBtn.disabled) {
+                saveToDbBtn.disabled = false;
+                saveToDbBtn.textContent = '💾 Save to Database';
+                saveToDbBtn.style.background = '';
+            }
+            if (saveAndVerifyBtn.disabled) {
+                saveAndVerifyBtn.disabled = false;
+                saveAndVerifyBtn.textContent = '💾📋 Save & Generate Verification';
+                saveAndVerifyBtn.style.background = '';
+            }
+        }
+
+        // Add auto-update logic for editable cells
+        if (data.results && data.results.length) {
+            data.results.forEach((res, idx) => {
+                // Check if this result has an answer key for grading
+                const doGrade = res.answer_key && res.answer_key.length > 0;
+                
+                let keyMap = {};
+                if (res.answer_key && typeof res.answer_key === 'string') {
+                    safeSplit(res.answer_key).forEach(pair => {
+                        if (pair && pair.trim()) {
+                            const parts = pair.split(':');
+                            const q = parts[0];
+                            const a = parts.slice(1).join(':');
+                            if (q && a) keyMap[parseInt(q.trim())] = a.trim().toUpperCase();
+                        }
+                    });
+                }
+                
+                const tiebreakerQs = res.tiebreaker_questions || [];
+                let mainTable = document.getElementById(`answers-table-${idx}`);
+                let tiebreakerTable = document.getElementById(`tiebreaker-table-${idx}`);
+                
+                // Function to add input listeners to a table
+                function addInputListeners(table, isTiebreaker = false) {
+                    if (!table) return;
+                    let inputs = table.querySelectorAll('input[type="text"]');
+                    inputs.forEach(input => {
+                        input.addEventListener('input', function() {
+                            // Re-enable save buttons when data is edited
+                            enableSaveButtons();
+                            
+                            let q = parseInt(this.getAttribute('data-q'));
+                            let correct = keyMap[q];
+                            let val = this.value.trim();
+                            let cell = this.parentElement;
+                            const isBlank = !val || val === '' || val === '--' || val === '—' || val.toUpperCase() === '--';
+                            
+                            // Update color based on correctness
+                            if (doGrade && !isBlank && val && correct) {
+                                if (val.toUpperCase() === correct.toUpperCase()) {
+                                    cell.style.background = '#c8f7c5';
+                                } else {
+                                    cell.style.background = '#ffd6d6';
+                                }
+                            } else {
+                                cell.style.background = '';
+                                cell.style.backgroundColor = '';
+                            }
+                            // Update score summary
+                            if (doGrade) {
+                                let mainCorrect = 0;
+                                let tiebreakerCorrect = 0;
+                                
+                                // Count main answers
+                                if (mainTable) {
+                                    let mainInputs = mainTable.querySelectorAll('input[type="text"]');
+                                    mainInputs.forEach(inp => {
+                                        let q2 = parseInt(inp.getAttribute('data-q'));
+                                        let v2 = inp.value.trim();
+                                        const isBlank2 = !v2 || v2 === '' || v2 === '--' || v2 === '—' || v2.toUpperCase() === '--';
+                                        if (keyMap[q2] && !isBlank2 && v2.toUpperCase() === keyMap[q2]) mainCorrect++;
+                                    });
+                                }
+                                
+                                // Count tiebreaker answers
+                                if (tiebreakerTable) {
+                                    let tbInputs = tiebreakerTable.querySelectorAll('input[type="text"]');
+                                    tbInputs.forEach(inp => {
+                                        let q2 = parseInt(inp.getAttribute('data-q'));
+                                        let v2 = inp.value.trim();
+                                        const isBlank2 = !v2 || v2 === '' || v2 === '--' || v2 === '—' || v2.toUpperCase() === '--';
+                                        if (keyMap[q2] && !isBlank2 && v2.toUpperCase() === keyMap[q2]) tiebreakerCorrect++;
+                                    });
+                                }
+                                
+                                let scoreDiv = document.getElementById(`score-summary-${idx}`);
+                                if (scoreDiv) {
+                                    if (tiebreakerTable) {
+                                        let mainTotal = mainTable ? mainTable.querySelectorAll('input[type="text"]').length : 0;
+                                        let tbTotal = tiebreakerTable.querySelectorAll('input[type="text"]').length;
+                                        let tiebreakerDecimal = tiebreakerCorrect / 100;
+                                        let finalScore = (mainCorrect + tiebreakerDecimal).toFixed(2);
+                                        scoreDiv.textContent = `Score: ${finalScore} (${mainCorrect}/${mainTotal} + ${tiebreakerCorrect}/${tbTotal} TB)`;
+                                    } else {
+                                        let mainTotal = mainTable ? mainTable.querySelectorAll('input[type="text"]').length : 0;
+                                        scoreDiv.textContent = `Score: ${mainCorrect}/${mainTotal}`;
+                                    }
+                                }
+                            }
+                        });
+                    });
+                }
+                
+                // Add listeners to both tables
+                addInputListeners(mainTable, false);
+                addInputListeners(tiebreakerTable, true);
+                
+                // Add listener to student ID input
+                const studentIdInput = document.getElementById(`student-id-${idx}`);
+                if (studentIdInput) {
+                    studentIdInput.addEventListener('input', function() {
+                        enableSaveButtons();
+                    });
+                }
+            });
+        }
+        } catch (renderError) {
+            console.error('Error rendering results:', renderError);
+            document.getElementById('results').innerHTML += '<div style="color:#c00; margin-top:1em;">Error rendering results: ' + renderError.message + '</div>';
+        }
+    });
+
+    // --- CSV Export Logic ---
+    exportCsvBtn.onclick = function() {
+            // Get test name
+            const testName = testSelect.value || 'results';
+            // Get number of questions from config (from first result)
+            let numQuestions = 0;
+            let answerKeyArr = [];
+            if (data.results && data.results.length && data.results[0].answers) {
+                numQuestions = data.results[0].answers.length;
+                // Parse answer key string to array
+                if (data.results[0].answer_key && typeof data.results[0].answer_key === 'string') {
+                    let keyMap = {};
+                    safeSplit(data.results[0].answer_key).forEach(pair => {
+                        if (pair && pair.trim()) {
+                            const parts = pair.split(':');
+                            const q = parts[0];
+                            const a = parts.slice(1).join(':');
+                            if (q && a) keyMap[parseInt(q.trim())] = a.trim().toUpperCase();
+                        }
+                    });
+                    for (let q = 1; q <= numQuestions; q++) answerKeyArr.push(keyMap[q] || '');
+                }
+            } else {
+                numQuestions = 40; // fallback
+                answerKeyArr = Array(numQuestions).fill('');
+            }
+            // Gather all tables and student IDs
+            const resultsDiv = document.getElementById('results');
+            const tables = resultsDiv.querySelectorAll('table[id^="answers-table-"]');
+            const studentIds = Array.from(resultsDiv.querySelectorAll('h3')).map(h3 => {
+                let m = h3.textContent.match(/Student ID: (.*)/);
+                return m ? m[1].trim() : '';
+            });
+            // Build header rows
+            let header1 = ['', '', '', ''];  // Empty cells for Event/Student ID/Correct/Incorrect columns
+            for (let q = 1; q <= numQuestions; q++) header1.push(answerKeyArr[q-1] || '');
+            let header2 = ['Event', 'Student ID#', 'Correct', 'Incorrect'];
+            for (let q = 1; q <= numQuestions; q++) header2.push('Q' + q);
+            let csv = [header1.join(','), header2.join(',')];
+            // Build rows
+            tables.forEach((table, idx) => {
+                let row = [];
+                const studentId = studentIds[idx] || '';
+                
+                // Extract grade from student ID (first character)
+                const grade = studentId.length > 0 ? studentId[0] : '';
+                
+                // Create simplified event name from test name
+                let eventName = testName;
+                if (testName.includes('Art Part B')) {
+                    eventName = 'Art' + grade;
+                } else if (testName.includes('Dictionary Skills')) {
+                    eventName = 'Dictionary' + grade;
+                } else if (testName.includes('Maps, Graphs, & Charts')) {
+                    eventName = 'Maps' + grade;
+                } else if (testName.includes('Mathematics')) {
+                    eventName = 'Math' + grade;
+                } else if (testName.includes('Science')) {
+                    eventName = 'Science' + grade;
+                } else if (testName.includes('Listening')) {
+                    eventName = 'Listening' + grade;
+                } else if (testName.includes('Social Studies')) {
+                    eventName = 'Social' + grade;
+                } else if (testName.includes('Chess Puzzle')) {
+                    eventName = 'Chess' + grade;
+                } else {
+                    // Generic fallback: remove spaces and append grade
+                    eventName = testName.replace(/\s+/g, '') + grade;
+                }
+                
+                row.push('"' + eventName + '"');
+                row.push('"' + studentId + '"');
+                let answers = {};
+                // Get all answer inputs by data-q
+                let inputs = table.querySelectorAll('input[type="text"]');
+                inputs.forEach(input => {
+                    let qNum = parseInt(input.getAttribute('data-q'));
+                    let ans = input.value.trim();
+                    if (!isNaN(qNum)) answers[qNum] = ans;
+                });
+                
+                // Calculate correct/incorrect counts if grading is enabled
+                let correctCount = 0;
+                let incorrectCount = 0;
+                if (answerKeyArr && answerKeyArr.length > 0) {
+                    for (let q = 1; q <= numQuestions; q++) {
+                        let studentAnswer = (answers[q] || '').trim();
+                        let correctAnswer = (answerKeyArr[q-1] || '').toUpperCase();
+                        // Treat blank, empty, or "--" as no answer
+                        const isBlank = !studentAnswer || studentAnswer === '' || studentAnswer === '--';
+                        if (!isBlank && correctAnswer) {
+                            if (studentAnswer.toUpperCase() === correctAnswer) {
+                                correctCount++;
+                            } else {
+                                incorrectCount++;
+                            }
+                        }
+                    }
+                }
+                
+                // Add correct/incorrect counts
+                row.push(correctCount.toString());
+                row.push(incorrectCount.toString());
+                
+                // Add individual answers
+                for (let q = 1; q <= numQuestions; q++) row.push('"' + (answers[q] || '') + '"');
+                csv.push(row.join(','));
+            });
+            // Download
+            let blob = new Blob([csv.join('\n')], {type: 'text/csv'});
+            let url = URL.createObjectURL(blob);
+            let a = document.createElement('a');
+            a.href = url;
+            a.download = testName.replace(/\s+/g, '_') + '.csv';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+        };
+
+        // --- Teacher Verification Logic ---
+        // Old teacherVerificationBtn handler removed - functionality now in combined saveAndVerifyBtn
+
+        // --- Save to Database Logic ---
+        saveToDbBtn.onclick = async function() {
+            if (!lastScanData || !lastScanData.results) {
+                alert('No scan data available. Please scan sheets first.');
+                return;
+            }
+            
+            const testName = testSelect.value || 'Unknown Test';
+            
+            // Get session name from dropdown
+            const sessionSelect = document.getElementById('session-select');
+            const sessionName = sessionSelect.value;
+            
+            if (!sessionName || sessionName === '__NEW__') {
+                alert('Please select a valid session before saving to database.');
+                return;
+            }
+            
+            // Prepare batch data
+            const saveData = lastScanData.results.map((result, idx) => {
+                const answersObj = {};
+                const tiebreakerQs = result.tiebreaker_questions || [];
+                
+                // Read from main answer table
+                const answerTable = document.querySelector(`#answers-table-${idx}`);
+                if (answerTable) {
+                    const inputs = answerTable.querySelectorAll('input[type="text"]');
+                    inputs.forEach(input => {
+                        const q = parseInt(input.getAttribute('data-q'));
+                        const val = input.value.trim();
+                        answersObj[q] = val || '';
+                    });
+                }
+                
+                // Read from tiebreaker table if it exists
+                const tiebreakerTable = document.querySelector(`#tiebreaker-table-${idx}`);
+                if (tiebreakerTable) {
+                    const inputs = tiebreakerTable.querySelectorAll('input[type="text"]');
+                    inputs.forEach(input => {
+                        const q = parseInt(input.getAttribute('data-q'));
+                        const val = input.value.trim();
+                        answersObj[q] = val || '';
+                    });
+                }
+                
+                // Get current student ID
+                const studentIdInput = document.getElementById(`student-id-${idx}`);
+                const currentStudentId = studentIdInput ? studentIdInput.value : (result.studentId || result.student_id);
+                
+                // Calculate scores
+                const keyMap = result.answerKey || {};
+                let mainCorrect = 0;
+                let tiebreakerCorrect = 0;
+                let incorrect = 0;
+                
+                Object.keys(answersObj).forEach(q => {
+                    const qNum = parseInt(q);
+                    const studentAnswer = answersObj[q];
+                    const correctAnswer = keyMap[qNum];
+                    const isBlank = !studentAnswer || studentAnswer === '' || studentAnswer === '--';
+                    
+                    if (!isBlank && correctAnswer) {
+                        if (studentAnswer.toUpperCase() === correctAnswer.toUpperCase()) {
+                            if (tiebreakerQs.includes(qNum)) {
+                                tiebreakerCorrect++;
+                            } else {
+                                mainCorrect++;
+                            }
+                        } else {
+                            incorrect++;
+                        }
+                    }
+                });
+                
+                const tiebreakerDecimal = tiebreakerCorrect / 100;
+                const score = tiebreakerTable ? parseFloat((mainCorrect + tiebreakerDecimal).toFixed(2)) : mainCorrect;
+                
+                return {
+                    student_id: currentStudentId,
+                    test_name: result.testName || testName,
+                    session_name: sessionName,
+                    score: score,
+                    correct_count: mainCorrect,
+                    incorrect_count: incorrect,
+                    tiebreaker_correct: tiebreakerCorrect,
+                    answers: answersObj,
+                    answer_key: keyMap
+                };
+            });
+            
+            // Save to database
+            try {
+                saveToDbBtn.disabled = true;
+                saveToDbBtn.textContent = '💾 Saving...';
+                
+                const response = await fetch('/api/save_scan_batch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ results: saveData })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    alert(`✓ Successfully saved ${data.saved_count} scan results to database!\nSession: ${sessionName}`);
+                    saveToDbBtn.textContent = '✓ Saved to Database';
+                    saveToDbBtn.style.background = '#28a745';
+                    // Reload sessions list to include the new session
+                    loadSessions();
+                } else {
+                    alert('Error saving to database: ' + (data.message || 'Unknown error'));
+                    saveToDbBtn.disabled = false;
+                    saveToDbBtn.textContent = '💾 Save to Database';
+                }
+            } catch (error) {
+                console.error('Error saving to database:', error);
+                alert('Error saving to database. Check console for details.');
+                saveToDbBtn.disabled = false;
+                saveToDbBtn.textContent = '💾 Save to Database';
+            }
+        };
+
+        // Save to Database AND Generate Verification Reports (combined button)
+        saveAndVerifyBtn.onclick = async function() {
+            if (!lastScanData || !lastScanData.results) {
+                alert('No scan data available. Please scan sheets first.');
+                return;
+            }
+            
+            // First, save to database (same logic as saveToDbBtn)
+            const testName = testSelect.value || 'Unknown Test';
+            const sessionSelect = document.getElementById('session-select');
+            const sessionName = sessionSelect.value;
+            
+            if (!sessionName || sessionName === '__NEW__') {
+                alert('Please select a valid session before saving to database.');
+                return;
+            }
+            
+            // Prepare batch data (same as save button)
+            const saveData = lastScanData.results.map((result, idx) => {
+                const answersObj = {};
+                const tiebreakerQs = result.tiebreaker_questions || [];
+                
+                const answerTable = document.querySelector(`#answers-table-${idx}`);
+                if (answerTable) {
+                    const inputs = answerTable.querySelectorAll('input[type="text"]');
+                    inputs.forEach(input => {
+                        const q = parseInt(input.getAttribute('data-q'));
+                        const val = input.value.trim();
+                        answersObj[q] = val || '';
+                    });
+                }
+                
+                const tiebreakerTable = document.querySelector(`#tiebreaker-table-${idx}`);
+                if (tiebreakerTable) {
+                    const inputs = tiebreakerTable.querySelectorAll('input[type="text"]');
+                    inputs.forEach(input => {
+                        const q = parseInt(input.getAttribute('data-q'));
+                        const val = input.value.trim();
+                        answersObj[q] = val || '';
+                    });
+                }
+                
+                const studentIdInput = document.getElementById(`student-id-${idx}`);
+                const currentStudentId = studentIdInput ? studentIdInput.value : (result.studentId || result.student_id);
+                
+                const keyMap = result.answerKey || {};
+                let mainCorrect = 0;
+                let tiebreakerCorrect = 0;
+                let incorrect = 0;
+                
+                Object.keys(answersObj).forEach(q => {
+                    const qNum = parseInt(q);
+                    const studentAnswer = answersObj[q];
+                    const correctAnswer = keyMap[qNum];
+                    const isBlank = !studentAnswer || studentAnswer === '' || studentAnswer === '--';
+                    
+                    if (!isBlank && correctAnswer) {
+                        if (studentAnswer.toUpperCase() === correctAnswer.toUpperCase()) {
+                            if (tiebreakerQs.includes(qNum)) {
+                                tiebreakerCorrect++;
+                            } else {
+                                mainCorrect++;
+                            }
+                        } else {
+                            incorrect++;
+                        }
+                    }
+                });
+                
+                const tiebreakerDecimal = tiebreakerCorrect / 100;
+                const score = tiebreakerTable ? parseFloat((mainCorrect + tiebreakerDecimal).toFixed(2)) : mainCorrect;
+                
+                return {
+                    student_id: currentStudentId,
+                    test_name: result.testName || testName,
+                    session_name: sessionName,
+                    score: score,
+                    correct_count: mainCorrect,
+                    incorrect_count: incorrect,
+                    tiebreaker_correct: tiebreakerCorrect,
+                    answers: answersObj,
+                    answer_key: keyMap
+                };
+            });
+            
+            // Save to database first
+            try {
+                saveAndVerifyBtn.disabled = true;
+                saveAndVerifyBtn.textContent = '💾 Saving...';
+                
+                const response = await fetch('/api/save_scan_batch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ results: saveData })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    saveAndVerifyBtn.textContent = '📋 Generating reports...';
+                    
+                    // Now generate verification reports (same logic as teacherVerificationBtn)
+                    const verificationResults = lastScanData.results.map((result, idx) => {
+                        const answersObj = {};
+                        const answerTable = document.querySelector(`#answers-table-${idx}`);
+                        if (answerTable) {
+                            const inputs = answerTable.querySelectorAll('input[type="text"]');
+                            inputs.forEach(input => {
+                                const q = parseInt(input.getAttribute('data-q'));
+                                const val = input.value.trim();
+                                answersObj[q] = val || '';
+                            });
+                        }
+                        
+                        const tiebreakerTable = document.querySelector(`#tiebreaker-table-${idx}`);
+                        if (tiebreakerTable) {
+                            const inputs = tiebreakerTable.querySelectorAll('input[type="text"]');
+                            inputs.forEach(input => {
+                                const q = parseInt(input.getAttribute('data-q'));
+                                const val = input.value.trim();
+                                answersObj[q] = val || '';
+                            });
+                        }
+                        
+                        const studentIdInput = document.getElementById(`student-id-${idx}`);
+                        const currentStudentId = studentIdInput ? studentIdInput.value : (result.studentId || result.student_id);
+                        
+                        return {
+                            studentId: currentStudentId,
+                            answers: answersObj,
+                            answerKey: result.answerKey,
+                            testName: result.testName || testName
+                        };
+                    });
+                    
+                    const existingResults = JSON.parse(localStorage.getItem('teacherVerificationResults') || '[]');
+                    const timestamp = new Date().toISOString();
+                    const newResults = verificationResults.map(result => ({
+                        ...result,
+                        timestamp: timestamp
+                    }));
+                    const allResults = [...existingResults, ...newResults];
+                    localStorage.setItem('teacherVerificationResults', JSON.stringify(allResults));
+                    
+                    // Show success message
+                    alert(`✓ Successfully saved ${data.saved_count} scan results!\nOpening verification reports...`);
+                    
+                    // Update button state
+                    saveAndVerifyBtn.textContent = '✓ Saved & Generated';
+                    saveAndVerifyBtn.style.background = '#28a745';
+                    
+                    // Also update the regular save button
+                    saveToDbBtn.disabled = true;
+                    saveToDbBtn.textContent = '✓ Saved to Database';
+                    saveToDbBtn.style.background = '#28a745';
+                    
+                    // Reload sessions list
+                    loadSessions();
+                    
+                    // Open verification page
+                    window.open('/teacher_verification', '_blank');
+                } else {
+                    alert('Error saving to database: ' + (data.message || 'Unknown error'));
+                    saveAndVerifyBtn.disabled = false;
+                    saveAndVerifyBtn.textContent = '💾📋 Save & Generate Verification';
+                }
+            } catch (error) {
+                console.error('Error saving to database:', error);
+                alert('Error saving to database. Check console for details.');
+                saveAndVerifyBtn.disabled = false;
+                saveAndVerifyBtn.textContent = '💾📋 Save & Generate Verification';
+            }
+        };
+
+        // Helper function to parse answer key string into object
+        function parseAnswerKey(answerKeyString) {
+            const answerKeyObj = {};
+            if (answerKeyString && typeof answerKeyString === 'string') {
+                safeSplit(answerKeyString).forEach(pair => {
+                    if (pair && pair.trim()) {
+                        const parts = pair.split(':');
+                        const q = parts[0];
+                        const a = parts.slice(1).join(':');
+                        if (q && a) {
+                            answerKeyObj[parseInt(q.trim())] = a.trim().toUpperCase();
+                        }
+                    }
+                });
+            }
+            return answerKeyObj;
+        }
+
+        // Start New Test - Clear results and reset the form
+        function startNewTest() {
+            if (confirm('Are you sure you want to start a new test? This will clear all current scan results and teacher verification data.')) {
+                // Clear the results display
+                document.getElementById('results').innerHTML = '';
+                
+                // Hide the action buttons
+                saveToDbBtn.style.display = 'none';
+                saveAndVerifyBtn.style.display = 'none';
+                exportCsvBtn.style.display = 'none';
+                startNewTestBtn.style.display = 'none';
+                
+                // Clear the stored scan data
+                lastScanData = null;
+                
+                // Clear teacher verification results from localStorage
+                localStorage.removeItem('teacherVerificationResults');
+                
+                // Reset the file input
+                document.getElementById('sheet-file').value = '';
+                
+                // Reset the test selection to force reselection
+                testSelect.value = '';
+                
+                // Scroll to top
+                window.scrollTo({top: 0, behavior: 'smooth'});
+            }
+        }
+    </script>
+    
+    <!-- Back to Top Button -->
+    <div style="text-align: center; margin: 3em 0 2em 0;">
+        <button onclick="window.scrollTo({top: 0, behavior: 'smooth'}); return false;" 
+                style="background: #28a745; color: #fff; border: none; border-radius: 4px; padding: 0.8em 2em; font-size: 1em; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+            ⬆️ Back to Top
+        </button>
+    </div>
+    </div><!-- end main-content -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('init-loader').style.display = 'none';
+            document.getElementById('main-content').style.display = 'block';
+        });
+    </script>
+</body>
+</html>

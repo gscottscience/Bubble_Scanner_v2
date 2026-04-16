@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Manage School List</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; background: #f8f9fa; color: #333; }
+        h1 { color: #007bff; }
+        .container { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #ccc; padding: 2em; max-width: 600px; margin: 2em auto; }
+        label { font-weight: bold; }
+        input[type="text"] { width: 80%; padding: 0.5em; margin: 0.5em 0; }
+        .school-row { display: flex; align-items: center; margin-bottom: 0.5em; }
+        .school-row input { margin-right: 1em; }
+        .btn { background: #007bff; color: white; border: none; padding: 0.5em 1.2em; border-radius: 4px; cursor: pointer; margin-right: 0.5em; }
+        .btn-danger { background: #dc3545; }
+        .btn-success { background: #28a745; }
+        .btn:disabled { background: #aaa; }
+        .upload-section { margin: 2em 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Manage School List</h1>
+        <form id="uploadForm" class="upload-section" enctype="multipart/form-data">
+            <label for="file">Upload School List (JSON):</label>
+            <input type="file" id="file" name="file" accept="application/json">
+            <button type="submit" class="btn btn-success">Upload</button>
+        </form>
+        <hr>
+        <h2>Edit School List</h2>
+        <form id="editForm">
+            <div id="schoolList"></div>
+            <button type="button" class="btn btn-success" onclick="addRow()">Add School</button>
+            <button type="submit" class="btn">Save Changes</button>
+        </form>
+    </div>
+    <script>
+    // @ts-nocheck - Jinja2 template syntax
+    let schoolList = {{ school_list|tojson }};
+        function renderList() {
+            const container = document.getElementById('schoolList');
+            container.innerHTML = '';
+            Object.entries(schoolList).forEach(function([code, name]) {
+                const row = document.createElement('div');
+                row.className = 'school-row';
+                row.innerHTML = `<input type='text' value='${code}' size='2' class='code'> <input type='text' value='${name}' class='name'> <button type='button' class='btn btn-danger' onclick='removeRow(this)'>Delete</button>`;
+                container.appendChild(row);
+            });
+        }
+        function addRow() {
+            const container = document.getElementById('schoolList');
+            const row = document.createElement('div');
+            row.className = 'school-row';
+            row.innerHTML = `<input type='text' value='' size='2' class='code'> <input type='text' value='' class='name'> <button type='button' class='btn btn-danger' onclick='removeRow(this)'>Delete</button>`;
+            container.appendChild(row);
+        }
+        function removeRow(btn) {
+            btn.parentElement.remove();
+        }
+        document.getElementById('editForm').onsubmit = function(e) {
+            e.preventDefault();
+            const rows = document.querySelectorAll('.school-row');
+            const newList = {};
+            rows.forEach(row => {
+                const code = row.querySelector('.code').value.trim();
+                const name = row.querySelector('.name').value.trim();
+                if (code && name) newList[code] = name;
+            });
+            fetch('/api/school_list', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newList)
+            }).then(r => r.json()).then(data => {
+                if (data.status === 'success') {
+                    schoolList = newList;
+                    renderList();
+                    alert('School list updated!');
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            });
+    };
+        document.getElementById('uploadForm').onsubmit = function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            fetch('/school_list/upload', {
+                method: 'POST',
+                body: formData
+            }).then(r => r.text()).then(msg => {
+                alert(msg);
+                location.reload();
+            });
+        };
+        renderList();
+    </script>
+</body>
+</html>

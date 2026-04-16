@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Configure Test Templates</title>
+    <!-- No OpenCV.js needed; cropping and ROI handled by backend preview image -->
+    <style>
+        body { font-family: sans-serif; margin: 2em; background-color: #f4f4f9; color: #333; }
+        h1 { color: #444; }
+        p a { color: #007bff; text-decoration: none; }
+        p a:hover { text-decoration: underline; }
+        form { background: white; padding: 2em; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 800px; }
+        label { font-weight: bold; margin-bottom: 0.5em; display: block; }
+        select, textarea { width: 100%; padding: 0.5em; margin-bottom: 1em; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        textarea { font-family: monospace; height: 400px; resize: vertical; }
+        button { padding: 0.7em 1.5em; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 1em; }
+        button:hover { background-color: #0056b3; }
+        #save-status { margin-top: 1em; padding: 1em; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; display: block; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; display: block; }
+        .button-group button { margin-right: 0.5em; }
+    </style>
+</head>
+<body>
+    <h1>Configure Test Templates</h1>
+    <p><a href="{{ url_for('index') }}">&larr; Back to Home</a></p>
+    <button id="add-test-btn" style="margin-bottom:1em; padding:0.7em 1.5em; background:#28a745; color:white; border:none; border-radius:4px; font-size:1em; cursor:pointer;">Add New Test Template</button>
+    <div id="add-test-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.4); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:white; padding:2em; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15); min-width:320px; max-width:400px; margin:auto;">
+            <h2>Add New Test Template</h2>
+            <label for="new-test-name">Test Name:</label>
+            <input type="text" id="new-test-name" style="width:100%; margin-bottom:1em;">
+            <label for="new-test-file">Optional PDF/Image:</label>
+            <input type="file" id="new-test-file" accept=".pdf,.png,.jpg,.jpeg,image/*" style="margin-bottom:1em;">
+            <div style="margin-top:1em;">
+                <button id="create-test-btn" style="background:#007bff; color:white; padding:0.5em 1.2em; border:none; border-radius:4px;">Create</button>
+                <button id="cancel-test-btn" style="background:#ccc; color:#333; padding:0.5em 1.2em; border:none; border-radius:4px; margin-left:1em;">Cancel</button>
+            </div>
+            <div id="add-test-status" style="margin-top:1em; color:#c00;"></div>
+        </div>
+    </div>
+    <div style="margin-bottom:1em;">
+        <button id="add-student-roi-btn" style="background:#6f42c1; color:white; padding:0.5em 1em; border:none; border-radius:4px; margin-right:1em;">Add Student ID ROI</button>
+        <button id="add-answer-roi-btn" style="background:#fd7e14; color:white; padding:0.5em 1em; border:none; border-radius:4px;">Add Answer Column ROI</button>
+    </div>
+    <div id="add-answer-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.4); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:white; padding:2em; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15); min-width:320px; max-width:400px; margin:auto;">
+            <h2>Add Answer Column ROI</h2>
+            <label>Number of Questions (Rows): <input type="number" id="num-questions" min="1" max="100" value="20" style="width:80px;"></label><br>
+            <label>Number of Choices (Columns): <input type="number" id="num-choices" min="2" max="10" value="4" style="width:80px;"></label><br>
+            <div style="margin-top:1em;">
+                <button id="confirm-answer-roi-btn" style="background:#007bff; color:white; padding:0.5em 1.2em; border:none; border-radius:4px;">Add</button>
+                <button id="cancel-answer-roi-btn" style="background:#ccc; color:#333; padding:0.5em 1.2em; border:none; border-radius:4px; margin-left:1em;">Cancel</button>
+            </div>
+        </div>
+    </div>
+    <form id="config-form" enctype="multipart/form-data" autocomplete="off">
+    </form>
+    <div id="preview-area" style="margin-top:2em; display:none;">
+        <h2>Template Preview</h2>
+        <div style="display:flex; align-items:flex-start; gap:32px;">
+            <div style="position:relative; display:inline-block; min-width:600px;">
+                <img id="preview-img" src="" alt="Template Preview" style="max-width:600px; border:1px solid #ccc; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+                <canvas id="roi-canvas" style="position:absolute; left:0; top:0; pointer-events:auto;"></canvas>
+            </div>
+            <div style="min-width:320px; max-width:400px;">
+                <div class="config-section" id="roi-sliders" style="display:none; margin-bottom:2em;">
+                    <h2>Adjust Template ROIs</h2>
+                    <div id="roi-slider-container"></div>
+                    <div style="margin-top:1em; font-size:0.95em; color:#555;">Move sliders to adjust each ROI and threshold. Changes update the config and preview live.<br>Or drag rectangles directly on the preview image.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="save-status"></div>
+    <script>
+    window.addEventListener('DOMContentLoaded', function() {
+        const previewBtn = document.getElementById('preview-btn');
+        const previewImg = document.getElementById('preview-img');
+        const previewArea = document.getElementById('preview-area');
+        const configTextarea = document.getElementById('config-content');
+        previewBtn.disabled = false;
+        previewBtn.style.backgroundColor = '#007bff';
+        previewBtn.textContent = 'Preview Template';
+
+        previewBtn.addEventListener('click', async () => {
+            if (!configTextarea.value.trim()) {
+                alert('Please select a template so configuration is loaded.');
+                return;
+            }
+            const imageInput = document.getElementById('preview-image-upload');
+            const file = imageInput.files[0];
+            if (!file) {
+                alert('Please upload a sample template image.');
+                return;
+            }
+            previewBtn.disabled = true;
+            previewBtn.textContent = 'Loading...';
+            previewArea.style.display = 'none';
+            try {
+                const formData = new FormData();
+                formData.append('preview_image', file);
+                formData.append('config_content', configTextarea.value);
+                const response = await fetch('/api/preview_template', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                if (data.preview_path) {
+                    previewImg.src = '/' + data.preview_path + `?t=${Date.now()}`;
+                    previewArea.style.display = 'block';
+                    document.getElementById('roi-sliders').style.display = 'block';
+                    // Use backend-transformed ROIs for overlays
+                    window.backendPreviewRois = [
+                        { key: 'student_id_grid_roi', rect: data.student_id_grid_roi, color: '#6f42c1', label: 'Student ID ROI', rows: data.student_id_grid_rows, cols: data.student_id_grid_cols },
+                        { key: 'answers_grid_col1_roi', rect: data.answers_grid_col1_roi, color: '#28a745', label: 'Answers Col 1', rows: data.answers_grid_col1_rows, cols: data.answers_grid_col1_cols },
+                        { key: 'answers_grid_col2_upper_roi', rect: data.answers_grid_col2_upper_roi, color: '#fd7e14', label: 'Answers Col 2 Upper', rows: data.answers_grid_col2_upper_rows, cols: data.answers_grid_col2_upper_cols },
+                        { key: 'answers_grid_col2_lower_roi', rect: data.answers_grid_col2_lower_roi, color: '#fd7e14', label: 'Answers Col 2 Lower', rows: data.answers_grid_col2_lower_rows, cols: data.answers_grid_col2_lower_cols }
+                    ];
+                    updateRoiCanvas();
+                } else {
+                    throw new Error(data.error || 'No preview available');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                previewBtn.disabled = false;
+                previewBtn.textContent = 'Preview Template';
+            }
+        });
+
+        // ROI Add Buttons Logic
+        const addStudentRoiBtn = document.getElementById('add-student-roi-btn');
+        const addAnswerRoiBtn = document.getElementById('add-answer-roi-btn');
+        const addAnswerModal = document.getElementById('add-answer-modal');
+        const confirmAnswerRoiBtn = document.getElementById('confirm-answer-roi-btn');
+        const cancelAnswerRoiBtn = document.getElementById('cancel-answer-roi-btn');
+        addStudentRoiBtn.onclick = () => {
+            let configObj;
+            try { configObj = JSON.parse(configTextarea.value); } catch { configObj = {}; }
+            configObj["student_id_roi"] = [100, 200, 300, 400];
+            configObj["student_id_threshold"] = 0.7;
+            configTextarea.value = JSON.stringify(configObj, null, 4);
+            previewBtn.click();
+        };
+        addAnswerRoiBtn.onclick = () => {
+            addAnswerModal.style.display = 'flex';
+        };
+        cancelAnswerRoiBtn.onclick = () => {
+            addAnswerModal.style.display = 'none';
+        };
+        confirmAnswerRoiBtn.onclick = () => {
+            const numQuestions = parseInt(document.getElementById('num-questions').value);
+            const numChoices = parseInt(document.getElementById('num-choices').value);
+            let configObj;
+            try { configObj = JSON.parse(configTextarea.value); } catch { configObj = {}; }
+            // Find next available answer ROI key
+            let idx = 1;
+            while (configObj[`answers_roi_col${idx}`]) idx++;
+            configObj[`answers_roi_col${idx}`] = [150 + 100 * (idx-1), 700, 350, 1200];
+            configObj[`col${idx}_questions`] = numQuestions;
+            configObj[`col${idx}_choices`] = numChoices;
+            configObj["bubble_threshold"] = configObj["bubble_threshold"] || 0.7;
+            configTextarea.value = JSON.stringify(configObj, null, 4);
+            addAnswerModal.style.display = 'none';
+            previewBtn.click();
+        };
+    });
+    </script>
+
+    </script>
+    <script>
+
+    // Add New Test Template UI logic
+    const addTestBtn = document.getElementById('add-test-btn');
+    const addTestModal = document.getElementById('add-test-modal');
+    const createTestBtn = document.getElementById('create-test-btn');
+    const cancelTestBtn = document.getElementById('cancel-test-btn');
+    const addTestStatus = document.getElementById('add-test-status');
+    addTestBtn.onclick = () => {
+        addTestModal.style.display = 'flex';
+        addTestStatus.textContent = '';
+        document.getElementById('new-test-name').value = '';
+        document.getElementById('new-test-file').value = '';
+    };
+    cancelTestBtn.onclick = () => {
+        addTestModal.style.display = 'none';
+    };
+    createTestBtn.onclick = async (e) => {
+        e.preventDefault();
+        const testName = document.getElementById('new-test-name').value.trim();
+        const testFile = document.getElementById('new-test-file').files[0];
+        if (!testName) {
+            addTestStatus.textContent = 'Test name is required.';
+            return;
+        }
+        addTestStatus.textContent = 'Creating test...';
+        // Create minimal config
+        const config = { "student_id_roi": [100,200,300,400], "answers_roi_col1": [150,700,350,1200], "bubble_threshold": 0.7, "student_id_threshold": 0.7 };
+        // Optionally upload preview image
+        let previewPath = '';
+        if (testFile) {
+            const formData = new FormData();
+            formData.append('preview_image', testFile);
+            formData.append('config_content', JSON.stringify(config));
+            try {
+                const response = await fetch('/api/preview_template', { method: 'POST', body: formData });
+                const data = await response.json();
+                if (data.preview_path) previewPath = data.preview_path;
+            } catch {}
+        }
+        // Save config to backend
+        try {
+            const response = await fetch('/api/test_configs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ test_name: testName, config_content: JSON.stringify(config) })
+            });
+            const result = await response.json();
+            if (response.ok) {
+                addTestStatus.style.color = '#28a745';
+                addTestStatus.textContent = 'Test created!';
+                addTestModal.style.display = 'none';
+                loadTestConfigs();
+                testSelect.value = testName;
+                configTextarea.value = JSON.stringify(config, null, 4);
+            } else {
+                addTestStatus.style.color = '#c00';
+                addTestStatus.textContent = result.error || 'Error creating test.';
+            }
+        } catch (err) {
+            addTestStatus.style.color = '#c00';
+            addTestStatus.textContent = 'Error creating test.';
+        }
+    };
+
+    </script>
+            <p>
+                <label for="test-select">Select a Test Template:</label>
+                <select id="test-select" name="test_name">
+                    <option value="">-- Select a Template --</option>
+                </select>
+            </p>
+            <div class="button-group" style="margin-bottom:1em;">
+                <input type="file" id="preview-image-upload" accept=".png,.jpg,.jpeg,.pdf,image/*" style="margin-right:1em;">
+                <button type="button" id="preview-btn">Preview Template</button>
+            </div>
+            <div class="config-section" id="roi-sliders" style="display:none; margin-bottom:2em;">
+                <h2>Adjust Template ROIs</h2>
+                <div id="roi-slider-container"></div>
+                <div style="margin-top:1em; font-size:0.95em; color:#555;">Move sliders to adjust each ROI and threshold. Changes update the config and preview live.</div>
+            </div>
+            <!-- Removed duplicate config textarea and label from above preview -->
+            <p>
+                <button type="submit">Save Configuration</button>
+            </p>
+        </form>
+        <div id="preview-area" style="margin-top:2em; display:none;">
+            <h2>Template Preview</h2>
+            <div style="display:flex; align-items:flex-start; gap:32px;">
+                <div style="position:relative; display:inline-block; min-width:600px;">
+                    <img id="preview-img" src="" alt="Template Preview" style="max-width:600px; border:1px solid #ccc; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+                    <canvas id="roi-canvas" style="position:absolute; left:0; top:0; pointer-events:auto;"></canvas>
+                </div>
+                <div style="min-width:320px; max-width:400px;">
+                    <div class="config-section" id="roi-sliders" style="display:none; margin-bottom:2em;">
+                        <h2>Adjust Template ROIs</h2>
+                        <div id="roi-slider-container"></div>
+                        <div style="margin-top:1em; font-size:0.95em; color:#555;">Move sliders to adjust each ROI and threshold. Changes update the config and preview live.<br>Or drag rectangles directly on the preview image.</div>
+                    </div>
+                </div>
+            </div>
+            <!-- Test Scan UI moved below for accessibility -->
+            <div style="margin-top:2em; max-width:900px;">
+                <h3>Test Scan (side-by-side check)</h3>
+                <input type="file" id="test-scan-upload" accept=".png,.jpg,.jpeg,image/*" style="margin-bottom:0.5em;">
+                <button type="button" id="test-scan-btn">Run Test Scan</button>
+                <div id="test-scan-status" style="margin:0.5em 0; color:#0077cc;"></div>
+                <div id="test-scan-area" style="display:none; position:relative; max-width:600px;">
+                    <div style="position:relative; width:100%;">
+                        <img id="test-scan-img" src="" alt="Test Scan Result" style="width:100%; max-width:600px; border:1px solid #ccc; border-radius:8px; margin-bottom:0.5em; display:block;">
+                        <canvas id="test-scan-canvas" style="position:absolute; left:0; top:0; pointer-events:none; width:100%; height:100%;"></canvas>
+                    </div>
+                    <div id="test-scan-answers" style="margin-top:1em; font-size:1.1em;"></div>
+                </div>
+            </div>
+    // --- Test Scan logic ---
+    const testScanBtn = document.getElementById('test-scan-btn');
+    const testScanUpload = document.getElementById('test-scan-upload');
+    const testScanStatus = document.getElementById('test-scan-status');
+    const testScanArea = document.getElementById('test-scan-area');
+    const testScanImg = document.getElementById('test-scan-img');
+    const testScanCanvas = document.getElementById('test-scan-canvas');
+    const testScanAnswers = document.getElementById('test-scan-answers');
+
+    testScanBtn.addEventListener('click', async () => {
+        const file = testScanUpload.files[0];
+        if (!file) {
+            alert('Please upload a filled scan image.');
+            return;
+        }
+        testScanStatus.textContent = 'Scanning...';
+        testScanArea.style.display = 'none';
+        testScanAnswers.innerHTML = '';
+        try {
+            const formData = new FormData();
+            formData.append('bubble_sheet_image', file);
+            // Use current config as test_name (simulate a test config upload)
+            // We'll POST config as a string, backend must support this (or use a temp test name)
+            // For now, just use the selected test name
+            const selectedTest = testSelect.value;
+            if (!selectedTest) throw new Error('Select a template first.');
+            formData.append('test_name', selectedTest);
+            formData.append('grade_sheets', 'on');
+            const response = await fetch('/api/scan', { method: 'POST', body: formData });
+            const data = await response.json();
+            if (!data.results || !data.results[0]) throw new Error(data.error || 'No scan result.');
+            const result = data.results[0];
+            // Show scan image
+            if (result.cropped_image_url) {
+                testScanImg.src = '/' + result.cropped_image_url + `?t=${Date.now()}`;
+                testScanImg.onload = () => drawTestScanOverlays(result);
+            }
+            // Show answers
+            let html = '<b>Student ID:</b> ' + (result.student_id || '(not detected)') + '<br><b>Answers:</b><br><table><tr><th>Q#</th><th>Answer</th></tr>';
+            (result.answers || []).forEach(a => {
+                html += `<tr><td>${a.q}</td><td>${a.value || ''}</td></tr>`;
+            });
+            html += '</table>';
+            testScanAnswers.innerHTML = html;
+            testScanArea.style.display = 'block';
+            testScanStatus.textContent = 'Scan complete!';
+        } catch (err) {
+            testScanStatus.textContent = 'Error: ' + err.message;
+        }
+    });
+
+    function drawTestScanOverlays(result) {
+        const img = testScanImg;
+        if (!img.complete || !img.naturalWidth) return;
+        testScanCanvas.width = img.naturalWidth;
+        testScanCanvas.height = img.naturalHeight;
+        testScanCanvas.style.width = img.width + 'px';
+        testScanCanvas.style.height = img.height + 'px';
+        const ctx = testScanCanvas.getContext('2d');
+        ctx.clearRect(0,0,testScanCanvas.width,testScanCanvas.height);
+        // Use backend ROIs if available
+        if (result.student_id_grid_roi) {
+            drawRoi(ctx, result.student_id_grid_roi, '#6f42c1', 'Student ID ROI');
+        }
+        if (result.answers_grid_col1_roi) {
+            drawRoi(ctx, result.answers_grid_col1_roi, '#28a745', 'Answers Col 1');
+        }
+        if (result.answers_grid_col2_upper_roi) {
+            drawRoi(ctx, result.answers_grid_col2_upper_roi, '#fd7e14', 'Answers Col 2 Upper');
+        }
+        if (result.answers_grid_col2_lower_roi) {
+            drawRoi(ctx, result.answers_grid_col2_lower_roi, '#fd7e14', 'Answers Col 2 Lower');
+        }
+    }
+    function drawRoi(ctx, rect, color, label) {
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(rect[0], rect[1], rect[2], rect[3]);
+        ctx.font = 'bold 18px sans-serif';
+        ctx.fillStyle = color;
+        ctx.fillText(label, rect[0]+4, rect[1]+24);
+        ctx.restore();
+    }
+            <div style="margin-top:2em;">
+                <label for="config-content">Template Configuration (JSON):</label><br>
+                <textarea id="config-content" name="config_content" placeholder="Select a template to see its configuration..." style="width:100%; max-width:900px; height:300px; margin-top:1em;"></textarea>
+            </div>
+        </div>
+    </form>
+    <div id="save-status"></div>
+
+    <!-- Move all main scripts to the end of body for proper execution -->
+    <script>
+    // All main JS logic from above goes here
+    window.addEventListener('DOMContentLoaded', function() {
+
+        // (Move all JS logic here, after DOM is loaded)
+    });
+    </script>
+    <script>
+    // Add New Test Template UI logic

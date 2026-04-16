@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Manage Answer Keys</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>Manage Answer Keys</h1>
+    <p id="sessionInfo" style="color:#666; font-size:1em; margin-bottom:1em;"></p>
+    <p><a href="{{ url_for('index') }}">&larr; Back to Home</a></p>
+    <form id="key-form">
+        <p>
+            <label for="test-select">Select a Test:</label>
+            <select id="test-select" name="test_name">
+                <option value="">-- Select a Test --</option>
+                <!-- Options will be dynamically loaded by JavaScript -->
+            </select>
+        </p>
+            <p>
+                <label for="grade-select">Select Grade Level(s):</label>
+                <select id="grade-select" name="grade_levels" multiple size="3">
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                    <option value="8">8</option>
+                </select>
+                <br><small>Hold Ctrl (Windows) or Command (Mac) to select multiple grades.</small>
+            </p>
+        <p>
+            <label for="answer-key-input">Answer Key (e.g., 1:A, 2:B, 3:C):</label><br>
+            <textarea id="answer-key-input" name="answer_key" rows="10" cols="80" placeholder="Select a test to see its answer key..."></textarea>
+        </p>
+        <p>
+            <button type="submit" id="save-key-button">Save Answer Key</button>
+        </p>
+    </form>
+    <div id="save-status"></div>
+
+    <script>
+        const testSelect = document.getElementById('test-select');
+        const answerKeyTextarea = document.getElementById('answer-key-input');
+        const keyForm = document.getElementById('key-form');
+        const saveStatus = document.getElementById('save-status');
+        const sessionInfo = document.getElementById('sessionInfo');
+
+        let testConfigs = {};
+        let answerKeys = {}; // Store fetched answer keys here
+        let currentSession = ''; // Current session name from URL parameter
+
+        // Get session from URL parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        currentSession = urlParams.get('session') || '';
+        
+        if (currentSession) {
+            sessionInfo.textContent = `Session: ${currentSession}`;
+            sessionInfo.style.fontWeight = 'bold';
+            sessionInfo.style.color = '#28a745';
+        } else {
+            sessionInfo.textContent = 'Warning: No session specified. Answer keys will not be saved correctly.';
+            sessionInfo.style.color = '#dc3545';
+            sessionInfo.style.fontWeight = 'bold';
+        }
+
+        // Function to load initial data
+        async function loadInitialData() {
+            try {
+                // Fetch test configs for the dropdown
+                const configResponse = await fetch('/api/test_configs');
+                if (!configResponse.ok) throw new Error('Failed to load test configs');
+                testConfigs = await configResponse.json();
+
+                // Populate the select dropdown
+                testSelect.innerHTML = '<option value="">-- Select a Test --</option>';
+                for (const testName in testConfigs) {
+                    const option = document.createElement('option');
+                    option.value = testName;
+                    option.textContent = testName;
+                    testSelect.appendChild(option);
+                }
+
+                // Fetch existing answer keys for this session
+                const keysResponse = await fetch(`/api/keys?session=${encodeURIComponent(currentSession)}`);
+                if (!keysResponse.ok) throw new Error('Failed to load answer keys');
+                answerKeys = await keysResponse.json();
+
+            } catch (error) {
+                console.error("Error loading initial data:", error);
+                saveStatus.textContent = 'Error loading page data.';
+                saveStatus.className = 'error';
+            }
+        }
+
+        // Load configs when the page loads
+        document.addEventListener('DOMContentLoaded', loadInitialData);
+
+        // When a test or grade is selected, show its key (if all selected grades have the same key)
+        const gradeSelect = document.getElementById('grade-select');
+        function getSelectedGrades() {
+            return Array.from(gradeSelect.selectedOptions).map(opt => opt.value);
+        }
+        function getKeyForTestGrades(test, grades) {
+            // If all selected grades have the same key, show it; else blank
+            if (!grades.length) return '';
+            const keys = grades.map(g => answerKeys[`${test}_${g}`] || '');
+            const allSame = keys.every(k => k === keys[0]);
+            return allSame ? keys[0] : '';
+        }
+        function updateKeyTextarea() {
+            const selectedTest = testSelect.value;
+            const selectedGrades = getSelectedGrades();
+            answerKeyTextarea.value = getKeyForTestGrades(selectedTest, selectedGrades);
+            saveStatus.textContent = '';
+            saveStatus.className = '';
+        }
+        testSelect.addEventListener('change', updateKeyTextarea);
+        gradeSelect.addEventListener('change', updateKeyTextarea);
+
+        // When the form is submitted, save the key
+        keyForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const selectedTest = testSelect.value;
+            const selectedGrades = getSelectedGrades();
+            if (!selectedTest) {
+                saveStatus.textContent = 'Please select a test first.';
+                saveStatus.className = 'error';
+                return;
+            }
+            if (!selectedGrades.length) {
+                saveStatus.textContent = 'Please select at least one grade.';
+                saveStatus.className = 'error';
+                return;
+            }
+            const updatedKey = answerKeyTextarea.value;
+            saveStatus.textContent = 'Saving...';
+            saveStatus.className = '';
+            try {
+                // Save for all selected grades
+                for (const grade of selectedGrades) {
+                    const response = await fetch('/api/keys', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            test_name: `${selectedTest}_${grade}`, 
+                            key_string: updatedKey,
+                            session: currentSession
+                        })
+                    });
+                    const result = await response.json();
+                    if (!response.ok) {
+                        throw new Error(result.message || result.error || 'An unknown error occurred.');
+                    }
+                    // Update local cache of keys
+                    answerKeys[`${selectedTest}_${grade}`] = updatedKey;
+                }
+                saveStatus.textContent = 'Answer key saved for selected grade(s).';
+                saveStatus.className = 'success';
+            } catch (error) {
+                saveStatus.textContent = `Error: ${error.message}`;
+                saveStatus.className = 'error';
+            }
+        });
+    </script>
+</body>
+</html>

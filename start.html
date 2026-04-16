@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Bubble Sheet Scanner - Home</title>
+	<style>
+		body { font-family: sans-serif; margin: 2em; background-color: #f4f4f9; color: #333; text-align: center; }
+		h1 { color: #444; }
+		.start-page-menu { margin-top: 3em; }
+		.button-large { display: inline-block; background-color: #007bff; color: white; padding: 1em 2em; margin: 0.5em; border-radius: 8px; text-decoration: none; font-size: 1.2em; transition: background-color 0.3s; }
+		.button-large:hover { background-color: #0056b3; }
+	</style>
+</head>
+<body>
+	<h1>Bubble Sheet Grading System</h1>
+	<div class="start-page-menu">
+		<a href="{{ url_for('simple_scan_page') }}" class="button-large" style="background-color:#28a745;">
+			Quick Simple Scan<br>
+			<span style="font-size:0.9em; color:#eaf6ff;">Upload a sheet and instantly see detected bubbles.</span>
+		</a>
+		<button class="button-large" style="background-color:#007bff;" onclick="openSchoolListModal()">
+			Manage School List<br>
+			<span style="font-size:0.9em; color:#eaf6ff;">Upload or edit school names and codes.</span>
+		</button>
+	</div>
+
+	<!-- School List Modal -->
+	<div id="schoolListModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.4); z-index:1000; align-items:center; justify-content:center;">
+		<div style="background:#fff; border-radius:8px; box-shadow:0 2px 8px #ccc; padding:2em; max-width:600px; margin:5vh auto; position:relative;">
+			<button onclick="closeSchoolListModal()" style="position:absolute; top:1em; right:1em; background:none; border:none; font-size:1.5em; color:#888; cursor:pointer;">&times;</button>
+			<h2>Manage School List</h2>
+			<form id="uploadForm" class="upload-section" enctype="multipart/form-data" style="margin-bottom:1em;">
+				<label for="file">Upload School List (JSON):</label>
+				<input type="file" id="file" name="file" accept="application/json">
+				<button type="submit" class="btn btn-success">Upload</button>
+			</form>
+			<hr>
+			<h3>Edit School List</h3>
+			<form id="editForm">
+				<div id="schoolList"></div>
+				<button type="button" class="btn btn-success" onclick="addRow()">Add School</button>
+				<button type="submit" class="btn">Save Changes</button>
+			</form>
+		</div>
+	</div>
+
+	<style>
+		.btn { background: #007bff; color: white; border: none; padding: 0.5em 1.2em; border-radius: 4px; cursor: pointer; margin-right: 0.5em; }
+		.btn-danger { background: #dc3545; }
+		.btn-success { background: #28a745; }
+		.btn:disabled { background: #aaa; }
+		.school-row { display: flex; align-items: center; margin-bottom: 0.5em; }
+		.school-row input { margin-right: 1em; }
+	</style>
+	<script>
+		function openSchoolListModal() {
+			document.getElementById('schoolListModal').style.display = 'flex';
+			fetchSchoolList();
+		}
+		function closeSchoolListModal() {
+			document.getElementById('schoolListModal').style.display = 'none';
+		}
+		let schoolList = {};
+		function fetchSchoolList() {
+			fetch('/api/school_list').then(r => r.json()).then(data => {
+				schoolList = data;
+				renderList();
+			});
+		}
+		function renderList() {
+			const container = document.getElementById('schoolList');
+			if (!container) return;
+			container.innerHTML = '';
+			Object.entries(schoolList).forEach(([code, name]) => {
+				const row = document.createElement('div');
+				row.className = 'school-row';
+				row.innerHTML = `<input type='text' value='${code}' size='2' class='code'> <input type='text' value='${name}' class='name'> <button type='button' class='btn btn-danger' onclick='removeRow(this)'>Delete</button>`;
+				container.appendChild(row);
+			});
+		}
+		function addRow() {
+			const container = document.getElementById('schoolList');
+			const row = document.createElement('div');
+			row.className = 'school-row';
+			row.innerHTML = `<input type='text' value='' size='2' class='code'> <input type='text' value='' class='name'> <button type='button' class='btn btn-danger' onclick='removeRow(this)'>Delete</button>`;
+			container.appendChild(row);
+		}
+		function removeRow(btn) {
+			btn.parentElement.remove();
+		}
+		document.addEventListener('DOMContentLoaded', function() {
+			document.getElementById('editForm').onsubmit = function(e) {
+				e.preventDefault();
+				const rows = document.querySelectorAll('.school-row');
+				const newList = {};
+				rows.forEach(row => {
+					const code = row.querySelector('.code').value.trim();
+					const name = row.querySelector('.name').value.trim();
+					if (code && name) newList[code] = name;
+				});
+				fetch('/api/school_list', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(newList)
+				}).then(r => r.json()).then(data => {
+					if (data.status === 'success') {
+						schoolList = newList;
+						renderList();
+						alert('School list updated!');
+					} else {
+						alert('Error: ' + data.error);
+					}
+				});
+			};
+			document.getElementById('uploadForm').onsubmit = function(e) {
+				e.preventDefault();
+				const formData = new FormData(this);
+				fetch('/school_list/upload', {
+					method: 'POST',
+					body: formData
+				}).then(r => r.text()).then(msg => {
+					alert(msg);
+					fetchSchoolList();
+				});
+			};
+		});
+	</script>
+	</div>
+</body>
+</html>
+
+

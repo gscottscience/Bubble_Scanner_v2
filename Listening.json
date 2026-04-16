@@ -1,0 +1,48 @@
+{
+    "bubble_threshold": 0.65,
+    "bubble_intensity_threshold": 210,
+    "num_questions": 25,
+    "tiebreaker_questions": [],
+    "circle_params": {
+        "dp": 1,
+        "maxRadius": 18,
+        "minDist": 25,
+        "minRadius": 8,
+        "param1": 30,
+        "param2": 15
+    },
+    "answer_columns": [
+        {
+            "label": "Col1",
+            "roi": [95, 560, 260, 720],
+            "start_q": 1,
+            "end_q": 13,
+            "choices": 4,
+            "type": "A-D"
+        },
+        {
+            "label": "Col2",
+            "roi": [660, 560, 260, 660],
+            "start_q": 14,
+            "end_q": 25,
+            "choices": 4,
+            "type": "mixed",
+            "question_types": {
+                "14": {"choices": 4, "type": "A-D"},
+                "15": {"choices": 4, "type": "A-D"},
+                "16": {"choices": 4, "type": "A-D"},
+                "17": {"choices": 4, "type": "A-D"},
+                "18": {"choices": 4, "type": "A-D"},
+                "19": {"choices": 2, "type": "T-F"},
+                "20": {"choices": 2, "type": "T-F"},
+                "21": {"choices": 2, "type": "T-F"},
+                "22": {"choices": 2, "type": "T-F"},
+                "23": {"choices": 2, "type": "T-F"},
+                "24": {"choices": 2, "type": "T-F"},
+                "25": {"choices": 2, "type": "T-F"}
+            }
+        }
+    ],
+    "student_id_roi": [65, 180, 180, 295],
+    "student_id_threshold": 0.7
+}

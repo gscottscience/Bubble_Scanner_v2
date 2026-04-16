@@ -1,0 +1,38 @@
+{
+    "template_name": "Social Studies",
+    "num_questions": 40,
+    "bubble_threshold": 0.78,
+    "bubble_intensity_threshold": 170,
+    "tiebreaker_questions": [],
+    "circle_params": {
+        "dp": 1,
+        "maxRadius": 25,
+        "minDist": 25,
+        "minRadius": 8,
+        "param1": 30,
+        "param2": 15
+    },
+    "answer_columns": [
+        {
+            "label": "Col1",
+            "roi": [115, 550, 280, 840],
+            "start_q": 1,
+            "end_q": 20,
+            "choices": 4,
+            "type": "A-D"
+        },
+        {
+            "label": "Col2", 
+            "roi": [700, 550, 280, 840],
+            "start_q": 21,
+            "end_q": 40,
+            "choices": 4,
+            "type": "A-D"
+        }
+    ],
+    "student_id_roi": [65, 180, 180, 300],
+    "student_id_threshold": 0.7,
+    "min_corner_square_area": 50,
+    "max_corner_square_area": 10000,
+    "template_id": "Social Studies"
+}

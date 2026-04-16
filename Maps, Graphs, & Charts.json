@@ -1,0 +1,57 @@
+{
+    "bubble_threshold": 0.78,
+    "bubble_intensity_threshold": 170,
+    "num_questions": 75,
+    "tiebreaker_questions": [],
+    "circle_params": {
+        "dp": 1,
+        "maxRadius": 25,
+        "minDist": 25,
+        "minRadius": 8,
+        "param1": 30,
+        "param2": 15
+    },
+    "answer_columns": [
+        {
+            "label": "Col1",
+            "roi": [95, 550, 220, 860],
+            "start_q": 1,
+            "end_q": 25,
+            "choices": 4,
+            "type": "A-D"
+        },
+        {
+            "label": "Col2",
+            "roi": [460, 550, 220, 860],
+            "start_q": 26,
+            "end_q": 50,
+            "choices": 4,
+            "type": "mixed",
+            "question_types": {
+                "26": "T-F",
+                "27": "T-F", "28": "T-F", "29": "T-F", "30": "T-F",
+                "31": "A-D", "32": "A-D", "33": "A-D", "34": "A-D", "35": "A-D",
+                "36": "A-D", "37": "A-D", "38": "A-D", "39": "A-D", "40": "A-D",
+                "41": "T-F", "42": "T-F", "43": "T-F", "44": "T-F", "45": "T-F",
+                "46": "A-D", "47": "A-D", "48": "A-D", "49": "A-D", "50": "A-D"
+            }
+        },
+        {
+            "label": "Col3",
+            "roi": [835, 550, 220, 860],
+            "start_q": 51,
+            "end_q": 75,
+            "choices": 4,
+            "type": "mixed",
+            "question_types": {
+                "51": "A-D", "52": "A-D", "53": "A-D", "54": "A-D", "55": "A-D",
+                "56": "T-F", "57": "T-F", "58": "T-F", "59": "T-F", "60": "T-F",
+                "61": "A-D", "62": "A-D", "63": "A-D", "64": "A-D", "65": "A-D",
+                "66": "A-D", "67": "A-D", "68": "A-D", "69": "A-D", "70": "A-D",
+                "71": "T-F", "72": "T-F", "73": "T-F", "74": "T-F", "75": "T-F"
+            }
+        }
+    ],
+    "student_id_roi": [65, 180, 170, 300],
+    "student_id_threshold": 0.7
+}
